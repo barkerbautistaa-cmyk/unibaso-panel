@@ -1,0 +1,2211 @@
+<!-- ============================================================
+     UNIBASO BARBER — Panel privado de Thiago
+     Turnos · Ventas · Balance · Horarios · Mensajes
+     Stack Barker System: HTML/CSS/JS vanilla.
+     MODO DEMO: guarda todo en localStorage (probalo ya).
+     MODO NUBE: pegar config Firebase + webhook n8n (pendiente).
+     ============================================================ -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unibaso Barber — Panel</title>
+<!-- Tipografía del logo: Bodoni Moda (Didone alto contraste) + Montserrat (wordmark/UI) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600;6..96,700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F0E9; --card:#FBF8F2; --panel:#ECE7DD;
+    --ink:#12100D; --charcoal:#26221D; --graphite:#6F685D;
+    --line:rgba(18,16,13,.14); --line-strong:rgba(18,16,13,.26);
+    --bg:var(--paper); --surface:var(--card); --raise:var(--panel);
+    --fg:var(--ink); --muted:var(--graphite); --hair:var(--line); --hair-strong:var(--line-strong);
+    --ok:#4F6B4E; --wait:#9A7C3E; --stop:#9E5348; --dollar:#2E7D4F;
+    --serif:"Bodoni Moda","Didot","Bodoni MT",Georgia,"Times New Roman",serif;
+    --sans:"Montserrat","Helvetica Neue","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0C0B09; --surface:#151310; --raise:#1E1B17;
+    --fg:#F2EEE6; --muted:#9C9284; --hair:rgba(242,238,230,.13); --hair-strong:rgba(242,238,230,.24);
+    --ok:#8FB58C; --wait:#CDA968; --stop:#D08476; --dollar:#54A870;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.5;
+    -webkit-font-smoothing:antialiased;font-size:15px;}
+  h1,h2,h3,h4{margin:0;text-wrap:balance}
+  button,input,select,textarea{font:inherit;color:inherit}
+  .serif{font-family:var(--serif);font-weight:400}
+  .spaced{letter-spacing:.28em;text-transform:uppercase}
+  .tnum{font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+
+  /* ---------- app shell ---------- */
+  .top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--hair)}
+  .top-in{max-width:1080px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;
+    justify-content:space-between;gap:14px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .mono{font-family:var(--serif);font-size:20px;width:38px;height:38px;display:grid;place-items:center;
+    border:1px solid var(--hair-strong)}
+  /* logo real UB (imagen), cambia según tema claro/oscuro.
+     El fondo sólido del JPG se funde con el header vía blend-mode, así no se ve el marco:
+     - claro: logo negro/blanco → multiply hace transparente el fondo blanco
+     - oscuro: logo blanco/negro → screen hace transparente el fondo negro */
+  .logo{height:42px;width:auto;display:block}
+  .gate .logo{height:78px;margin:0 auto 20px}
+  .logo-light{mix-blend-mode:multiply}
+  .logo-dark{mix-blend-mode:screen;display:none}
+  @media(prefers-color-scheme:dark){.logo-light{display:none}.logo-dark{display:block}}
+  :root[data-theme="light"] .logo-light{display:block}
+  :root[data-theme="light"] .logo-dark{display:none}
+  :root[data-theme="dark"] .logo-light{display:none}
+  :root[data-theme="dark"] .logo-dark{display:block}
+  .brand .nm{font-size:11px;font-weight:600}
+  .brand .sub{font-size:10px;color:var(--muted);letter-spacing:.22em;text-transform:uppercase}
+  .top-actions{display:flex;align-items:center;gap:10px}
+  .icon-btn{background:transparent;border:1px solid var(--hair);width:36px;height:36px;cursor:pointer;
+    display:grid;place-items:center;font-size:15px}
+  .icon-btn:hover{border-color:var(--fg)}
+
+  nav.tabs{max-width:1080px;margin:0 auto;padding:0 22px;display:flex;gap:2px;overflow-x:auto}
+  nav.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;
+    padding:14px 16px;cursor:pointer;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--muted);white-space:nowrap}
+  nav.tabs button:hover{color:var(--fg)}
+  nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--fg)}
+
+  main{max-width:1080px;margin:0 auto;padding:30px 22px 80px}
+  .view{display:none;animation:fade .3s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.view.active{animation:none}}
+
+  .view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    margin-bottom:22px;flex-wrap:wrap}
+  .view-head h2{font-family:var(--serif);font-size:30px}
+  .view-head .lead{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);
+    margin-bottom:6px}
+
+  /* controls */
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label.fld{display:flex;flex-direction:column;gap:5px;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted)}
+  input,select,textarea{background:var(--surface);border:1px solid var(--hair);padding:10px 12px;
+    color:var(--fg);border-radius:0}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--fg);outline-offset:1px}
+  textarea{resize:vertical;min-height:88px;line-height:1.5}
+  /* área de mensaje (promos): ocupa todo el ancho de la tarjeta y con altura cómoda */
+  #m_msg{width:100%;min-height:190px;font-size:15px;padding:16px;line-height:1.6}
+  .btn{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;padding:12px 20px;
+    border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer;transition:opacity .16s}
+  .btn:hover{opacity:.84}
+  .btn--ghost{background:transparent;color:var(--fg)}
+  .btn--sm{padding:8px 13px;font-size:10px;letter-spacing:.14em}
+  .btn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+
+  .card{background:var(--surface);border:1px solid var(--hair);padding:20px}
+  .card + .card{margin-top:16px}
+  .card-title{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);
+    margin-bottom:14px}
+
+  /* turno / list rows */
+  .rowitem{display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;
+    padding:13px 0;border-top:1px solid var(--hair)}
+  .rowitem:first-of-type{border-top:0}
+  .rowitem .hr{font-family:var(--serif);font-size:20px;width:66px}
+  /* columna día + hora (turnos) */
+  .when{display:flex;flex-direction:column;gap:1px;line-height:1.02;min-width:96px}
+  .when .d{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .when .h{font-family:var(--serif);font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;
+    white-space:nowrap}
+  .rowitem .who{font-size:14.5px}
+  .rowitem .who small{display:block;color:var(--muted);font-size:12px}
+  .pill{font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;
+    border:1px solid currentColor;border-radius:999px;white-space:nowrap}
+  .pill--ok{color:var(--ok)} .pill--wait{color:var(--wait)} .pill--stop{color:var(--stop)}
+  .mini{display:flex;gap:6px}
+  .mini button{background:transparent;border:1px solid var(--hair);padding:6px 9px;cursor:pointer;
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .mini button:hover{border-color:var(--fg);color:var(--fg)}
+  .tacts{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+  .empty{padding:36px 0;text-align:center;color:var(--muted);font-size:14px}
+  /* menú de 3 puntitos (acciones VIP desde el turno) */
+  .menuwrap{position:relative;display:inline-flex}
+  button.menudots, .mini button.menudots{background:transparent;border:1px solid var(--hair-strong);
+    padding:4px 9px;cursor:pointer;color:var(--fg);font-size:19px;font-weight:900;line-height:1;
+    display:inline-grid;place-items:center}
+  button.menudots:hover, .mini button.menudots:hover{border-color:var(--fg);background:var(--raise);color:var(--fg)}
+  .dmenu{position:absolute;right:0;top:calc(100% + 5px);z-index:40;background:var(--surface);
+    border:1px solid var(--hair-strong);min-width:158px;box-shadow:0 8px 24px rgba(0,0,0,.22);
+    display:flex;flex-direction:column}
+  .dmenu button{background:transparent;border:0;text-align:left;padding:11px 14px;cursor:pointer;
+    font-size:12.5px;color:var(--fg);white-space:nowrap;letter-spacing:.02em;text-transform:none}
+  .dmenu button + button{border-top:1px solid var(--hair)}
+  .dmenu button:hover{background:var(--raise)}
+  .dmenu .info{padding:11px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
+
+  /* agenda acordeón: 7 días, cada uno despliega su horario completo */
+  .dayblock{border:1px solid var(--hair);background:var(--surface);margin-bottom:10px}
+  .dayhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:14px 16px;background:transparent;border:0;cursor:pointer;text-align:left}
+  .dayhead:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
+  .dayhead .dn{font-family:var(--serif);font-size:18px;font-weight:700}
+  .dayhead .dc{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+  .dayhead .chev{color:var(--muted);font-size:13px;transition:transform .2s}
+  .dayblock.open .chev{transform:rotate(180deg)}
+  @media(prefers-reduced-motion:reduce){.dayhead .chev{transition:none}}
+  .daymini{padding:0 16px 13px;display:flex;flex-wrap:wrap;gap:5px 16px;font-size:13px;color:var(--muted)}
+  .daymini b{font-family:var(--serif);font-weight:700;color:var(--fg);margin-right:4px}
+  .dayfull{border-top:1px solid var(--hair);padding:4px 16px 10px}
+  .slot{display:grid;grid-template-columns:60px 1fr auto;gap:12px;align-items:center;
+    padding:8px 0;border-top:1px solid var(--hair)}
+  .slot:first-of-type{border-top:0}
+  .slot .sh{font-family:var(--serif);font-size:17px;font-weight:700}
+  .slot.libre .sh{color:var(--muted);font-weight:400}
+  .slot .free{color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+  .slot .who{font-size:14px}
+  .slot .who small{display:block;color:var(--muted);font-size:12px}
+  /* "Más adelante": turnos a más de 7 días, con fecha y día exactos */
+  .futblock{margin-top:18px}
+  .futblock .dayhead:hover{background:transparent}
+  .fslot{grid-template-columns:92px 1fr auto}
+  .fwhen{display:flex;flex-direction:column;line-height:1.05;gap:1px}
+  .fwhen .fd{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .fwhen .fh{font-family:var(--serif);font-size:17px;font-weight:700}
+
+  /* filas de ventas (cliente/producto/total + financiación en cuotas) */
+  .vrow{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:15px 0;
+    border-top:1px solid var(--hair)}
+  .vrow:first-of-type{border-top:0}
+  .vmain{min-width:0}
+  .vcli{font-size:15px}
+  .vmain small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+  .vtot{font-family:var(--serif);font-size:21px;font-weight:700;justify-self:end;white-space:nowrap}
+  .vstatus{grid-column:1 / -1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
+  .vfin{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:center;gap:10px;
+    flex-wrap:wrap;margin-top:6px;padding-top:10px;border-top:1px dashed var(--hair)}
+  .vfin .info{font-size:12.5px;color:var(--muted)}
+  .vfin .info b{color:var(--dollar);font-family:var(--serif);font-size:15px}
+  .chk{display:flex;flex-direction:row!important;align-items:center;gap:8px;text-transform:none;
+    letter-spacing:normal;color:var(--fg);font-size:13px}
+  .chk input{width:16px;height:16px;accent-color:var(--fg)}
+  .mini-x{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;line-height:1}
+  .mini-x:hover{color:var(--stop)}
+
+  /* balance */
+  .fact{padding:2px 2px 22px;display:flex;flex-direction:column;gap:4px}
+  .fact .k{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted)}
+  .fact .big{font-family:var(--serif);font-weight:700;color:var(--dollar);
+    font-size:clamp(42px,9vw,66px);line-height:1;margin:8px 0 2px}
+  .fact .split{display:flex;gap:28px;margin-top:14px;padding-top:16px;border-top:1px solid var(--hair)}
+  .fact .split div{font-size:12px;letter-spacing:.04em;color:var(--muted)}
+  .fact .split b{display:block;font-family:var(--serif);font-size:22px;font-weight:400;
+    margin-top:3px;color:var(--fg)}
+  /* ecuación bruto − costo = ganancia (resumen de ventas) */
+  .fact .split b.eqline{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .eqline .op{font-family:var(--sans);font-size:16px;color:var(--muted)}
+  .seg{display:inline-flex;border:1px solid var(--hair)}
+  .seg button{background:transparent;border:0;padding:9px 15px;cursor:pointer;font-size:11px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+  @media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:460px){.kpis{grid-template-columns:1fr}}
+  .kpi{border:1px solid var(--hair);padding:16px}
+  .kpi .kk{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .kpi .vv{font-family:var(--serif);font-size:26px;margin-top:6px}
+
+  /* historial mes a mes (vista Año) */
+  .hist-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+    flex-wrap:wrap;margin-bottom:16px}
+  .yearnav{display:flex;align-items:center;gap:12px}
+  .yearnav button{background:transparent;border:1px solid var(--hair);width:32px;height:32px;
+    cursor:pointer;font-size:18px;line-height:1;color:var(--fg);display:grid;place-items:center}
+  .yearnav button:hover{border-color:var(--fg)}
+  .yearnav b{font-size:22px;font-weight:700;min-width:64px;text-align:center}
+  .histtot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+    padding-bottom:14px;margin-bottom:12px;border-bottom:1px solid var(--hair-strong)}
+  .histtot .lbl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .histtot .amt{font-family:var(--serif);font-weight:700;color:var(--dollar);
+    font-size:clamp(26px,6vw,36px);line-height:1}
+  .mbar{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:6px 0}
+  .mbar .mm{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .mbar .track{height:14px;background:var(--raise);border:1px solid var(--hair);position:relative}
+  .mbar .fillb{position:absolute;left:0;top:0;bottom:0;background:var(--dollar);opacity:.85;min-width:2px}
+  .mbar.zero .fillb{display:none}
+  .mbar .amt{font-family:var(--serif);font-size:15px;font-weight:700;justify-self:end;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  .mbar.zero .amt{color:var(--muted);font-weight:400}
+  .mbar.actual .mm{color:var(--fg)}
+
+  /* VIP (tarjetas de membresía) */
+  .vipcard{border:1px solid var(--hair);border-left:3px solid var(--muted);background:var(--surface);
+    padding:16px 18px;margin-bottom:12px}
+  .vipcard.vip--ok{border-left-color:var(--ok)}
+  .vipcard.vip--wait{border-left-color:var(--wait)}
+  .vipcard.vip--stop{border-left-color:var(--stop)}
+  .viptop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .viptop .vipname{font-size:16px}
+  .viptop small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+  .viptag{font-family:var(--serif);font-size:13px;font-weight:700;letter-spacing:.04em;
+    border:1px solid var(--fg);padding:4px 10px;white-space:nowrap}
+  .vipbonos{display:flex;align-items:center;gap:12px;margin:14px 0 10px;flex-wrap:wrap}
+  .dots{display:flex;gap:6px}
+  .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--muted)}
+  .dot.used{background:var(--ok);border-color:var(--ok)}
+  :root[data-theme="dark"] .dot.used{background:var(--ok);border-color:var(--ok)}
+  .vipbonos .rem{font-size:13.5px;color:var(--muted)}
+  .vipbonos .rem b{font-family:var(--serif);font-size:20px;color:var(--fg);font-weight:700}
+  .vipdates{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);
+    padding-top:12px;border-top:1px solid var(--hair)}
+  .vipdates .sep{opacity:.5}
+  .vipfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .vipfoot .pack{font-size:12.5px;color:var(--muted)}
+  .vipfoot .pack b{color:var(--dollar);font-family:var(--serif);font-size:16px;font-weight:700}
+  .vipacts{display:flex;gap:6px;flex-wrap:wrap}
+  .vipacts button,.vipacts a{background:transparent;border:1px solid var(--hair);padding:7px 11px;cursor:pointer;
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:none}
+  .vipacts button:hover,.vipacts a:hover{border-color:var(--fg);color:var(--fg)}
+  .vipacts .danger:hover{border-color:var(--stop);color:var(--stop)}
+  .viptag--mini{font-size:9px;letter-spacing:.12em;color:var(--wait);border:1px solid currentColor;
+    padding:2px 6px;border-radius:999px;margin-left:7px;vertical-align:middle;font-family:var(--sans);font-weight:600}
+
+  /* clientes (cartera con notas desplegables) */
+  .crow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    padding:13px 0;border-top:1px solid var(--hair)}
+  .crow:first-of-type{border-top:0}
+  .crow .cn{font-size:15px;min-width:0}
+  .crow .cn small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+  .cacts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .cacts button,.cacts a{background:transparent;border:1px solid var(--hair);padding:7px 10px;
+    cursor:pointer;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    text-decoration:none}
+  .cacts button:hover,.cacts a:hover{border-color:var(--fg);color:var(--fg)}
+  .cacts button.danger:hover{border-color:var(--stop);color:var(--stop)}
+  .cnotes{border-top:1px dashed var(--hair);background:var(--raise);padding:12px 14px 14px;margin-bottom:2px}
+  .cnotes textarea{width:100%;min-height:84px;font-size:13.5px}
+  .cnotes .hintn{font-size:11px;color:var(--muted);margin-top:6px}
+
+  /* stock (catálogo editable: nombre + cantidad + costo + venta, por categorías) */
+  .srow{display:grid;grid-template-columns:1fr 72px 105px 105px 26px;gap:10px;align-items:center;
+    padding:7px 0;border-top:1px solid var(--hair)}
+  .srow:first-of-type{border-top:0}
+  .srow input{padding:8px 10px;font-size:13.5px;width:100%;min-width:0}
+  .srow input.agotado{border-color:var(--stop);color:var(--stop)}
+  .shead{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .scat{font-family:var(--serif);font-size:17px;font-weight:700;padding:18px 0 6px;
+    border-bottom:1px solid var(--hair-strong);margin-bottom:2px;display:flex;
+    justify-content:space-between;align-items:baseline}
+  .scat small{font-family:var(--sans);font-size:11px;font-weight:400;color:var(--muted);
+    letter-spacing:.08em;text-transform:uppercase}
+  /* desplegable por producto: totales según stock (costo/venta/ganancia) */
+  .sexp{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:11px;
+    padding:6px 2px;line-height:1}
+  .sexp:hover{color:var(--fg)}
+  .sdetail{border-top:1px dashed var(--hair);background:var(--raise);padding:12px 14px;
+    display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+  .sdetail .u{font-size:12px;color:var(--muted);align-self:center}
+  .sdetail div{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .sdetail b{display:block;font-family:var(--serif);font-size:19px;font-weight:700;
+    letter-spacing:0;text-transform:none;color:var(--fg);margin-top:2px}
+  .sdetail b.gan{color:var(--dollar)}
+  @media(max-width:560px){
+    /* el nombre ocupa una línea entera (legible); abajo cant/costo/venta/flecha */
+    .srow{grid-template-columns:56px 1fr 1fr 24px;gap:6px}
+    .srow>*:first-child{grid-column:1/-1}
+    .sdetail{gap:16px}
+  }
+
+  /* horarios */
+  .days{display:flex;gap:6px;flex-wrap:wrap}
+  .day{border:1px solid var(--hair);padding:9px 13px;cursor:pointer;font-size:12px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);user-select:none}
+  .day[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  /* horarios por día: fila = chip del día + dos franjas (la 2ª opcional) */
+  .hday{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:11px 0;
+    border-top:1px solid var(--hair)}
+  .hday:first-of-type{border-top:0}
+  .hday .day{width:54px;text-align:center;padding:9px 0}
+  .hday .fr{display:flex;gap:6px;align-items:center}
+  .hday .fr input{padding:8px 9px;font-size:13px}
+  .hday .fr .sep{font-size:11px;color:var(--muted);letter-spacing:.08em}
+  .hday .frlbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    margin-right:2px}
+  .hday.off .fr,.hday.off .modebtn{opacity:.35;pointer-events:none}
+  /* botón Corrido / 2 turnos por día */
+  .modebtn{background:transparent;border:1px solid var(--hair);padding:8px 11px;cursor:pointer;
+    font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .modebtn:hover{border-color:var(--fg);color:var(--fg)}
+  .modebtn[aria-pressed="true"]{border-color:var(--fg);color:var(--fg)}
+  .hday.single .fr2{display:none} /* en modo corrido no se muestra la 2ª franja */
+  /* francos (días puntuales que no corta) */
+  .franco-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .francos{display:flex;flex-wrap:wrap;gap:8px}
+  .fchip{display:flex;align-items:center;gap:8px;border:1px solid var(--hair-strong);
+    padding:8px 10px 8px 12px;font-size:13px}
+  .fchip .fx{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:14px;
+    line-height:1;padding:0 2px}
+  .fchip .fx:hover{color:var(--stop)}
+
+  /* mensajes */
+  .contact{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+    padding:11px 0;border-top:1px solid var(--hair)}
+  .contact:first-of-type{border-top:0}
+  .contact small{color:var(--muted);font-size:12px}
+  .contact input[type=checkbox]{width:16px;height:16px;accent-color:var(--fg)}
+  .wa{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    border:1px solid var(--hair);padding:6px 9px;text-decoration:none}
+  .wa:hover{border-color:var(--fg);color:var(--fg)}
+
+  /* modal genérico (selector de clientes en Mensajes) */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:grid;
+    place-items:center;padding:20px}
+  .modal .mbox{width:min(440px,100%);max-height:78vh;overflow:auto;background:var(--surface);
+    border:1px solid var(--hair-strong);padding:18px}
+  .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .prow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    padding:10px 0;border-top:1px solid var(--hair)}
+  .prow:first-of-type{border-top:0}
+  .prow .pn{font-size:14px;min-width:0}
+  .prow .pn small{display:block;color:var(--muted);font-size:12px}
+  .prow button{background:transparent;border:1px solid var(--hair);padding:6px 11px;cursor:pointer;
+    font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .prow button:hover:not(:disabled){border-color:var(--fg);color:var(--fg)}
+  .prow button:disabled{opacity:.45;cursor:default}
+
+  .banner{background:var(--raise);border:1px solid var(--hair);padding:12px 15px;font-size:12.5px;
+    color:var(--muted);margin-bottom:20px;display:flex;gap:10px;align-items:flex-start}
+  .banner b{color:var(--fg)}
+  .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;align-items:end}
+  .hidden{display:none!important}
+
+  /* login gate */
+  .gate{position:fixed;inset:0;background:var(--bg);z-index:50;display:grid;place-items:center;padding:24px}
+  .gate .box{width:min(360px,100%);text-align:center}
+  .gate .mono{margin:0 auto 22px;width:56px;height:56px;font-size:28px}
+  .gate h1{font-family:var(--serif);font-size:26px;margin-bottom:6px}
+  .gate p{color:var(--muted);font-size:13px;margin:0 0 22px}
+  .gate input{width:100%;text-align:center;letter-spacing:.2em;margin-bottom:12px}
+  .gate .btn{width:100%;justify-content:center}
+  .gate .hint{margin-top:14px;font-size:11px;color:var(--muted)}
+
+  /* ===== MOBILE (al final para ganar la cascada): nada se desborda del marco ===== */
+  @media(max-width:640px){
+    .slot{grid-template-columns:46px 1fr}
+    .fslot{grid-template-columns:96px 1fr}
+    .slot .tacts{grid-column:1/-1;justify-content:flex-end;padding-top:2px}
+    .mini{flex-wrap:wrap;justify-content:flex-end}
+    .mini button{padding:6px 8px}
+    .crow{grid-template-columns:1fr;gap:8px}
+    .cacts{justify-content:flex-start}
+    .fact .split{flex-direction:column;gap:14px}
+  }
+</style>
+
+<!-- ===== LOGIN =====
+     Dos modos: NUBE (Firebase Auth, mail + contraseña reales) y DEMO (clave fija).
+     El campo de mail y los hints se muestran u ocultan según CLOUD_CFG al arrancar. -->
+<div class="gate" id="gate">
+  <div class="box">
+    <img class="logo logo-light" src="logo-ub-light.jpeg" alt="Unibaso Barber">
+    <img class="logo logo-dark" src="logo-ub-dark.jpeg" alt="Unibaso Barber">
+    <p class="spaced" style="font-size:11px;margin-top:2px">Panel privado</p>
+    <input id="email" type="email" class="hidden" placeholder="Mail" autocomplete="username">
+    <input id="pass" type="password" placeholder="Clave" autocomplete="current-password">
+    <button class="btn" id="btnEntrar" onclick="login()">Entrar</button>
+    <div class="hint" id="hintDemo">Demo — clave: <b>unibaso</b></div>
+    <div class="hint hidden" id="hintCloud">Entrá con tu mail y tu contraseña</div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <img class="logo logo-light" src="logo-ub-light.jpeg" alt="Unibaso Barber">
+        <img class="logo logo-dark" src="logo-ub-dark.jpeg" alt="Unibaso Barber">
+        <span>
+          <span class="nm spaced">Unibaso Barber</span><br>
+          <span class="sub">Panel · Thiago</span>
+        </span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" onclick="toggleTheme()" title="Tema claro/oscuro" id="themeBtn">◐</button>
+        <button class="icon-btn" onclick="logout()" title="Salir">⟲</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" onclick="go('turnos',this)">Turnos</button>
+      <button role="tab" aria-selected="false" onclick="go('ventas',this)">Ventas</button>
+      <button role="tab" aria-selected="false" onclick="go('vip',this)">VIP</button>
+      <button role="tab" aria-selected="false" onclick="go('clientes',this)">Clientes</button>
+      <button role="tab" aria-selected="false" onclick="go('balance',this)">Balance</button>
+      <button role="tab" aria-selected="false" onclick="go('stock',this)">Stock</button>
+      <button role="tab" aria-selected="false" onclick="go('horarios',this)">Horarios</button>
+      <button role="tab" aria-selected="false" onclick="go('mensajes',this)">Mensajes</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ================= TURNOS ================= -->
+    <section class="view active" id="view-turnos">
+      <div class="view-head">
+        <div><div class="lead">Agenda</div><h2>Turnos</h2></div>
+        <div class="row">
+          <button class="btn btn--ghost btn--sm" onclick="toggleForm('turnoForm')">+ Nuevo turno</button>
+        </div>
+      </div>
+
+      <div class="card hidden" id="turnoForm">
+        <div class="card-title">Cargar turno manual</div>
+        <div class="formgrid">
+          <label class="fld">Cliente<input id="t_nombre" placeholder="Nombre"></label>
+          <label class="fld">WhatsApp<input id="t_tel" placeholder="549228..."></label>
+          <label class="fld">Servicio<select id="t_serv"></select></label>
+          <label class="fld">Fecha<input type="date" id="t_fecha"></label>
+          <label class="fld">Hora<input type="time" id="t_hora" value="10:00"></label>
+          <button class="btn" onclick="addTurno()">Guardar</button>
+        </div>
+      </div>
+
+      <div class="card"><div id="turnosList"></div></div>
+    </section>
+
+    <!-- ================= VENTAS ================= -->
+    <section class="view" id="view-ventas">
+      <div class="view-head">
+        <div><div class="lead">Caja</div><h2>Ventas</h2></div>
+        <button class="btn btn--ghost btn--sm" onclick="toggleForm('ventaForm')">+ Cargar venta</button>
+      </div>
+
+      <div class="card hidden" id="ventaForm">
+        <div class="card-title">Registrar venta</div>
+        <input type="hidden" id="v_costo">
+        <datalist id="prodList"></datalist>
+        <div class="formgrid">
+          <label class="fld">Cliente<input id="v_cliente" placeholder="Nombre"></label>
+          <label class="fld">WhatsApp<input id="v_tel" placeholder="549228..." inputmode="numeric"></label>
+          <label class="fld">Producto<input id="v_prod_txt" list="prodList" placeholder="Qué vendió"
+            onchange="onProdName()"></label>
+          <label class="fld">Total $<input type="number" id="v_total" min="0" step="100"></label>
+          <label class="fld">Método de pago<select id="v_pago">
+            <option>Efectivo</option><option>Transferencia</option><option>Débito/Crédito</option>
+            <option>Mercado Pago</option></select></label>
+          <label class="fld">Tipo<select id="v_tipo" onchange="toggleCuotas()">
+            <option value="contado">Contado</option>
+            <option value="financiado">Financiado (cuotas)</option></select></label>
+        </div>
+        <div class="formgrid hidden" id="cuotasFields" style="margin-top:14px">
+          <label class="fld">Cantidad de cuotas<input type="number" id="v_ncuotas" min="2" value="3"></label>
+          <label class="fld">Monto por cuota $<input type="number" id="v_montocuota" min="0" step="100"
+            placeholder="auto (total ÷ cuotas)"></label>
+          <label class="fld chk"><input type="checkbox" id="v_primera"> Primera cuota ya pagada</label>
+        </div>
+        <div class="row" style="margin-top:16px"><button class="btn" onclick="addVenta()">Guardar venta</button></div>
+      </div>
+
+      <div class="banner">
+        <span>💈</span>
+        <span>El <b>producto</b> es texto libre (con sugerencias del catálogo VIGGO). Las ventas
+          <b>financiadas</b> muestran las cuotas y su saldo; el bot puede cargarlas desde tu WhatsApp.</span>
+      </div>
+
+      <div class="card"><div id="ventasList"></div></div>
+    </section>
+
+    <!-- ================= VIP ================= -->
+    <section class="view" id="view-vip">
+      <div class="view-head">
+        <div><div class="lead">Membresías</div><h2>Clientes VIP</h2></div>
+        <button class="btn btn--ghost btn--sm" onclick="toggleForm('vipForm')">+ Nuevo VIP</button>
+      </div>
+
+      <div class="banner">
+        <span>⭐</span>
+        <span>El cliente paga por adelantado un pack de cortes con descuento. La tarjeta dura
+          <b>1 mes</b> (del día que abona al mismo día del mes siguiente). Cada corte realizado
+          <b>descuenta un bono</b>; el bot avisa <b>una semana antes</b> de que venza.</span>
+      </div>
+
+      <div class="card hidden" id="vipForm">
+        <div class="card-title">Dar de alta una tarjeta VIP</div>
+        <div class="formgrid">
+          <label class="fld">Cliente<input id="vp_nombre" placeholder="Nombre"></label>
+          <label class="fld">WhatsApp<input id="vp_tel" placeholder="549228..." inputmode="numeric"></label>
+          <label class="fld">Tarjeta<select id="vp_tipo" onchange="vipFormPreview()">
+            <option value="vip3">VIP 3 — 3 cortes (−20%)</option>
+            <option value="vip4">VIP 4 — 4 cortes (−23%)</option></select></label>
+          <label class="fld">Alta<input type="date" id="vp_alta"></label>
+          <label class="fld">Medio de pago<select id="vp_pago">
+            <option>Efectivo</option><option>Transferencia</option><option>Débito/Crédito</option>
+            <option>Mercado Pago</option></select></label>
+          <button class="btn" onclick="addVIP()">Guardar VIP</button>
+        </div>
+        <p class="muted" id="vipPreview" style="font-size:12.5px;margin:12px 2px 0"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:baseline">
+          <span>Precio del corte</span>
+          <span class="muted" style="letter-spacing:normal;text-transform:none;font-size:12px">
+            Base para calcular los packs</span>
+        </div>
+        <div class="row">
+          <label class="fld">Precio corte $<input type="number" id="vip_precio" min="0" step="500"
+            style="width:130px" onchange="saveVipPrecio()"></label>
+          <div class="muted" id="packInfo" style="font-size:13px;align-self:center"></div>
+        </div>
+      </div>
+
+      <div id="vipList"></div>
+    </section>
+
+    <!-- ================= CLIENTES ================= -->
+    <section class="view" id="view-clientes">
+      <div class="view-head">
+        <div><div class="lead">Cartera</div><h2>Clientes</h2></div>
+        <div class="row">
+          <span class="muted" id="cliCount" style="font-size:12px;letter-spacing:.14em;text-transform:uppercase">0 clientes</span>
+          <button class="btn btn--ghost btn--sm" onclick="toggleForm('cliForm')">+ Nuevo cliente</button>
+        </div>
+      </div>
+
+      <div class="card hidden" id="cliForm">
+        <div class="card-title">Agregar cliente</div>
+        <div class="formgrid">
+          <label class="fld">Nombre<input id="c_nombre" placeholder="Nombre"></label>
+          <label class="fld">WhatsApp<input id="c_tel" placeholder="549228..." inputmode="numeric"></label>
+          <button class="btn" onclick="addCliente()">Guardar</button>
+        </div>
+      </div>
+
+      <div class="banner">
+        <span>👥</span>
+        <span>Acá viven todos los clientes de la barbería (cortes y ventas). El <b>bot</b> agrega solo
+          a cada cliente nuevo que agenda, y si alguien saca turno para otra persona, le pide
+          <b>nombre y número</b> de esa persona para sumarla también.</span>
+      </div>
+
+      <div class="card">
+        <label class="fld" style="margin-bottom:14px">Buscar
+          <input id="cliSearch" placeholder="Nombre o teléfono..." oninput="renderClientes()"></label>
+        <div id="clientesList"></div>
+      </div>
+    </section>
+
+    <!-- ================= BALANCE ================= -->
+    <section class="view" id="view-balance">
+      <div class="view-head">
+        <div><div class="lead">Facturación</div><h2>Balance</h2></div>
+        <div class="seg" id="balSeg">
+          <button aria-pressed="true" onclick="setPeriod('hoy',this)">Hoy</button>
+          <button aria-pressed="false" onclick="setPeriod('semana',this)">Semana</button>
+          <button aria-pressed="false" onclick="setPeriod('mes',this)">Mes</button>
+          <button aria-pressed="false" onclick="setPeriod('anio',this)">Año</button>
+        </div>
+      </div>
+
+      <div class="fact">
+        <span class="k">Ganancia · <span id="balLabel">Hoy</span></span>
+        <span class="big tnum" id="balBruto">$ 0</span>
+        <div class="split">
+          <div>Cortes<b class="tnum" id="balCortes">$ 0</b></div>
+          <div>Membresías VIP<b class="tnum" id="balVip">$ 0</b></div>
+          <div>Ventas cobrado<b class="eqline tnum"><span id="eqBruto">$ 0</span><span class="op">−</span><span id="eqCosto">$ 0</span><span class="op">=</span><span id="eqGan" style="color:var(--dollar)">$ 0</span></b></div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="kk">Turnos realizados</div><div class="vv tnum" id="kCortesN">0</div></div>
+        <div class="kpi"><div class="kk">Ventas del período</div><div class="vv tnum" id="kVentasN">0</div></div>
+        <div class="kpi"><div class="kk">Facturación bruta</div><div class="vv tnum" id="kBruto">$ 0</div></div>
+        <div class="kpi"><div class="kk">Por cobrar (cuotas)</div><div class="vv tnum" id="kPorCobrar">$ 0</div></div>
+      </div>
+
+      <!-- Historial mes a mes (solo en vista Año) -->
+      <div class="card hidden" id="anioHist" style="margin-top:16px">
+        <div class="hist-head">
+          <div>
+            <div class="card-title" style="margin-bottom:2px">Historial mes a mes</div>
+            <span class="muted" style="font-size:12px">Ganancia de cada mes · total del año</span>
+          </div>
+          <div class="yearnav">
+            <button onclick="cambiarAnio(-1)" aria-label="Año anterior">‹</button>
+            <b id="histYear" class="serif">2026</b>
+            <button onclick="cambiarAnio(1)" aria-label="Año siguiente">›</button>
+          </div>
+        </div>
+        <div id="histBars"></div>
+      </div>
+    </section>
+
+    <!-- ================= STOCK ================= -->
+    <section class="view" id="view-stock">
+      <div class="view-head"><div><div class="lead">Catálogo</div><h2>Stock</h2></div></div>
+      <div class="banner">
+        <span>📦</span>
+        <span>Por producto: <b>cantidad</b>, <b>costo</b> y <b>precio de venta</b>, todo editable
+          (se guarda solo). Cada venta <b>descuenta 1 del stock</b> automáticamente. También lo va a poder
+          actualizar el bot por WhatsApp (ej: <b>"llegaron 10 ceras"</b>).</span>
+      </div>
+      <div class="card">
+        <label class="fld" style="margin-bottom:14px">Buscar
+          <input id="stockSearch" placeholder="Ej: tijera, cera, V-017..." oninput="renderStock()"></label>
+        <div class="srow">
+          <span class="shead">Producto</span><span class="shead">Cant.</span><span class="shead">Costo $</span><span class="shead">Venta $</span><span></span>
+        </div>
+        <div id="stockList"></div>
+      </div>
+    </section>
+
+    <!-- ================= HORARIOS ================= -->
+    <section class="view" id="view-horarios">
+      <div class="view-head"><div><div class="lead">Disponibilidad</div><h2>Horarios</h2></div></div>
+      <div class="card">
+        <div class="card-title">Horarios por día — hasta dos franjas</div>
+        <div id="diasBox"></div>
+        <p class="muted" style="font-size:12px;margin:12px 2px 0">Tocá el <b>día</b> para abrirlo o
+          cerrarlo, y el botón <b>Corrido / 2 turnos</b> para elegir si ese día trabajás de corrido
+          (una sola franja) o partido en dos (ej: lunes 10 a 14 y 16 a 20).</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Francos — días puntuales que no cortás</div>
+        <div class="franco-add">
+          <label class="fld">Desde<input type="date" id="francoDesde"></label>
+          <label class="fld">Hasta <span style="text-transform:none;letter-spacing:normal">(opcional)</span><input type="date" id="francoHasta"></label>
+          <button class="btn btn--sm" onclick="addFranco()">Marcar franco</button>
+        </div>
+        <div id="francosList"></div>
+        <p class="muted" style="font-size:12px;margin:12px 2px 0">Un <b>día puntual</b>: cargá solo
+          "Desde". Un <b>período</b> (ej: vacaciones): cargá "Desde" y "Hasta". El bot <b>no ofrece
+          turnos</b> en esos días; si ya había turnos, te los muestra para <b>cancelarlos y avisarle a
+          cada cliente</b> por WhatsApp.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Precio del corte</div>
+        <div class="row">
+          <label class="fld">Precio $<input type="number" id="h_precio" min="0" step="500"
+            style="width:150px" onchange="saveCortePrecio()"></label>
+          <div class="muted" style="font-size:12.5px;align-self:center;max-width:340px">
+            Es el precio del turno (corte, con diseño/barba o no) y la base con la que se calculan
+            las tarjetas VIP. Se guarda solo al cambiarlo.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Duración y agenda</div>
+        <div class="formgrid">
+          <label class="fld">Duración del corte<input type="time" id="h_slot" step="300"></label>
+          <label class="fld">Espacio entre turnos<input type="time" id="h_gap" step="300"></label>
+          <label class="fld">Agenda hasta (días)<input type="number" id="h_horizon" min="1"></label>
+          <button class="btn" onclick="saveHorarios()">Guardar horarios</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:12px 2px 0">Duración + espacio = cada cuánto
+          arranca un turno. Con <b>00:45</b> + <b>00:15</b> los turnos caen siempre en
+          <b>hora en punto</b> (10, 11, 12...).</p>
+      </div>
+    </section>
+
+    <!-- ================= MENSAJES ================= -->
+    <section class="view" id="view-mensajes">
+      <div class="view-head"><div><div class="lead">Fidelización</div><h2>Mensajes &amp; promos</h2></div></div>
+
+      <div class="card">
+        <div class="card-title">Filtrar contactos — no se corta desde hace…</div>
+        <div class="formgrid">
+          <label class="fld">Desde (días)<input type="number" id="m_desde" value="20" min="0"></label>
+          <label class="fld">Hasta (días)<input type="number" id="m_hasta" value="60" min="0"></label>
+          <button class="btn btn--ghost" onclick="runFilter()">Buscar</button>
+          <button class="btn btn--ghost" onclick="filtroTodos()">Todos los contactos</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 2px 0">Ej: de <b>20</b> a <b>60</b> días
+          trae a los que se cortaron por última vez hace entre 20 y 60 días.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between">
+          <span>Contactos <span id="m_count" class="muted">(0)</span></span>
+          <button class="btn btn--sm btn--ghost" onclick="openPicker()">+ Agregar contacto</button>
+        </div>
+        <div id="contactsList"><div class="empty">Corré un filtro o agregá un contacto a mano.</div></div>
+
+        <!-- lista emergente: elegir contactos desde la cartera de Clientes -->
+        <div class="modal hidden" id="pickerModal" onclick="if(event.target===this)closePicker()">
+          <div class="mbox">
+            <div class="mhead">
+              <span class="card-title" style="margin:0">Agregar desde Clientes</span>
+              <button class="mini-x" onclick="closePicker()" title="Cerrar">✕</button>
+            </div>
+            <input id="pickerSearch" placeholder="Buscar por nombre o teléfono..." oninput="renderPicker()"
+              style="width:100%;margin-bottom:10px">
+            <div id="pickerList"></div>
+            <p class="muted" style="font-size:11.5px;margin:12px 2px 0">¿No está acá? Cargalo primero
+              en la pestaña <b>Clientes</b> y va a aparecer en esta lista.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Mensaje</div>
+        <textarea id="m_msg" placeholder="Hola {nombre}! Hace rato no pasás por Unibaso ✂️ Te dejo 15% off esta semana. ¿Reservamos?"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" onclick="prepareSend()">Preparar envío</button>
+          <span class="muted" style="font-size:12px">Usá <b>{nombre}</b> para personalizar.</span>
+        </div>
+        <div id="sendResult" style="margin-top:14px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG NUBE (pendiente) — dejar vacío para modo demo
+   ============================================================ */
+window.UNIBASO_PROMO_WEBHOOK = ""; // n8n → WhatsApp Cloud API (envío masivo de promos)
+
+/* ============================================================
+   CAPA DE DATOS (localStorage) — misma idea que barker-data.js
+   ============================================================ */
+var LS = window.localStorage;
+var K = { cfg:"uni_cfg", serv:"uni_serv", prod:"uni_prod", turnos:"uni_turnos", ventas:"uni_ventas", vip:"uni_vip", clientes:"uni_clientes" };
+var read = function(k,f){ try{ var v=JSON.parse(LS.getItem(k)); return v==null?f:v; }catch(e){ return f; } };
+var write = function(k,v){ LS.setItem(k, JSON.stringify(v)); if(typeof cloudPush==="function") cloudPush(k,v); };
+var uid = function(){ return "u"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36); };
+var money = function(n){ return "$ "+ (n||0).toLocaleString("es-AR"); }; // espacio no separable: el $ nunca queda solo en otra línea
+var atDay = function(off,h,m){ var d=new Date(); d.setDate(d.getDate()+off); d.setHours(h,m||0,0,0); return d.toISOString(); };
+var justNow = function(){ return new Date().toISOString(); }; // cobro "de hoy" para el demo (siempre <= ahora)
+var iso = function(d){ var z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }; // fecha LOCAL, no UTC
+var daysBetween = function(a,b){ return Math.floor((b-a)/86400000); };
+
+/* ============================================================
+   MODO NUBE (opcional) — Firebase Firestore
+   ------------------------------------------------------------
+   Mientras CLOUD_CFG sea null, el panel funciona 100% en modo
+   DEMO (localStorage) igual que siempre. Al pegar la config del
+   proyecto Firebase, el mismo panel pasa a leer/escribir en la
+   nube y comparte datos con el bot (n8n) en tiempo real.
+   Cada colección (K.*) se guarda como un documento:
+     barberias/{BARBERIA_ID}/estado/{clave}  ->  { v: <datos>, t: <ts> }
+   ============================================================ */
+var CLOUD_CFG = {              // config del proyecto Firebase barker-unibaso (activa el modo nube)
+  apiKey: "AIzaSyAKXHPsHOxS2jDtwoWpFKdGK-2OYNoh8E8",
+  authDomain: "barker-unibaso.firebaseapp.com",
+  projectId: "barker-unibaso",
+  storageBucket: "barker-unibaso.firebasestorage.app",
+  messagingSenderId: "139601159752",
+  appId: "1:139601159752:web:e2c7af50ee6ba2432dda7d"
+};
+var BARBERIA_ID = "unibaso";   // id de esta barbería dentro del proyecto (permite multi-cliente)
+// Seguridad: en GitHub Pages la nube queda APAGADA por defecto (el demo público
+// del repo "unibaso" nunca debe tocar la base real). Solo el panel real, que vive
+// en el repo "unibaso-panel", queda con la nube activa.
+if(location.hostname.indexOf("github.io")>-1 &&
+   location.pathname.toLowerCase().indexOf("/unibaso-panel")!==0) CLOUD_CFG=null;
+var CLOUD = { on:false, fs:null, db:null, app:null, auth:null, am:null, user:null };
+var FB_VER = "https://www.gstatic.com/firebasejs/10.12.2/";
+
+/* La app de Firebase se crea UNA sola vez: la comparten Auth y Firestore
+   (initializeApp dos veces con el mismo nombre tira duplicate-app). */
+async function fbApp(){
+  if(CLOUD.app) return CLOUD.app;
+  var appMod = await import(FB_VER+"firebase-app.js");
+  CLOUD.app = appMod.initializeApp(CLOUD_CFG);
+  return CLOUD.app;
+}
+
+/* Carga Firebase Auth y resuelve con el usuario ya logueado (o null).
+   La sesión la persiste el navegador: Thiago entra una vez desde el celu. */
+async function authInit(){
+  if(!CLOUD_CFG) return null;
+  if(CLOUD.auth) return CLOUD.auth.currentUser;
+  var app = await fbApp();
+  var am  = await import(FB_VER+"firebase-auth.js");
+  CLOUD.am   = am;
+  CLOUD.auth = am.getAuth(app);
+  try{ await am.setPersistence(CLOUD.auth, am.browserLocalPersistence); }catch(e){}
+  return new Promise(function(res){
+    var stop = am.onAuthStateChanged(CLOUD.auth, function(u){ stop(); CLOUD.user=u; res(u); });
+  });
+}
+
+async function cloudInit(){
+  if(!CLOUD_CFG) return false;
+  try{
+    var app = await fbApp();
+    var fs  = await import(FB_VER+"firebase-firestore.js");
+    CLOUD.db = fs.getFirestore(app);
+    CLOUD.fs = fs;
+    CLOUD.on = true;
+    await cloudPullAll();   // baja todo al cache local una vez
+    cloudSubscribe();       // escucha cambios del bot / otro dispositivo
+    return true;
+  }catch(e){ console.warn("cloudInit falló, sigo en modo local:", e); CLOUD.on=false; return false; }
+}
+function cloudDoc(key){ return CLOUD.fs.doc(CLOUD.db, "barberias", BARBERIA_ID, "estado", key); }
+async function cloudPullAll(){
+  var keys = Object.keys(K).map(function(k){ return K[k]; });
+  for(var i=0;i<keys.length;i++){
+    try{ var snap = await CLOUD.fs.getDoc(cloudDoc(keys[i]));
+      if(snap.exists() && snap.data().v!=null) LS.setItem(keys[i], JSON.stringify(snap.data().v));
+    }catch(e){ console.warn("pull", keys[i], e); }
+  }
+}
+function cloudSubscribe(){
+  Object.keys(K).map(function(k){ return K[k]; }).forEach(function(key){
+    CLOUD.fs.onSnapshot(cloudDoc(key), function(snap){
+      if(!snap.exists() || snap.metadata.hasPendingWrites) return; // ignorar el eco de mi propia escritura
+      if(snap.data().v==null) return;
+      LS.setItem(key, JSON.stringify(snap.data().v));
+      if(typeof rerenderAll==="function") rerenderAll();
+    }, function(e){ console.warn("subscribe", key, e); });
+  });
+}
+var cloudQueue = Promise.resolve();
+function cloudPush(key,val){
+  if(!CLOUD.on) return;
+  cloudQueue = cloudQueue.then(function(){
+    return CLOUD.fs.setDoc(cloudDoc(key), { v: val, t: Date.now() });
+  }).catch(function(e){ console.warn("cloud push", key, e); });
+}
+function rerenderAll(){
+  try{ fillSelects(); renderTurnos(); renderVentas(); renderVIP(); renderClientes();
+       renderHorarios(); renderBalance(); renderStock(); renderContacts(); }catch(e){}
+}
+function startApp(){
+  if(CLOUD_CFG){ cloudInit().then(boot).catch(function(){ boot(); }); }
+  else boot();
+}
+
+/* ---------- Semillas (solo la primera vez) ---------- */
+function seed(){
+  // Versionado de datos DEMO: al subir DEMO_VER se reemplazan servicios, turnos y ventas
+  // guardados por los de ejemplo nuevos (solo etapa demo; se quita al pasar a producción).
+  var DEMO_VER=14;
+  var demoOld=parseInt(LS.getItem("uni_demover")||"0",10)<DEMO_VER;
+  // Un solo servicio: "Corte". El corte es plano, con diseño/barba o no.
+  if(!read(K.serv,null) || demoOld) write(K.serv,[
+    {id:"s1",nombre:"Corte",precio:14000,dur:30,activo:true}
+  ]);
+  /* ---- Catálogo VIGGO (lista mayorista 30/6/2026) — [nombre, mayorista, sugerido] ----
+     Se excluyen los ítems que figuran con precio ARS 0,00 en la lista. */
+  var CATALOGO_VER=3; // subir este número cuando se actualice la lista → reemplaza la guardada
+  // Los strings sueltos marcan la CATEGORÍA de los productos que siguen.
+  var VIGGO=[
+    "Máquinas",
+    ["Viggo Trimmer V-001 T-Valkiria 2026 B&G",51928,77892],
+    ["Viggo Trimmer V-001 T-Valkiria 2026 W&B",51928,77892],
+    ["Viggo Clipper V-002 Valkiria 2026 B&G",59995,89993],
+    ["Viggo Clipper V-002 Valkiria 2026 W&B",59995,89993],
+    ["Viggo Kit Classic completo (Clipper + Trimmer + Shaver + Base)",132949,199423],
+    ["Viggo Shaver V-003 Gold",52500,78750],
+    ["Viggo Shaver V-004 Black",52500,78750],
+    ["Viggo Shaver Sharp X",59072,88608],
+    ["Viggo Shaver V-021 GO",45578,68367],
+    ["Viggo Shaver V-020-D Volt Diamond Black",151926,227889],
+    ["Viggo Shaver V-020-A Volt Diamond 2026 Black",148160,222240],
+    ["Viggo Clipper V-010 Ema Medina",72160,108240],
+    ["Viggo Clipper V-015 Shock",72160,108240],
+    ["Viggo Trimmer V-015-A T-Shock",60770,91155],
+    ["Viggo Trimmer V-016 Deep",36459,54688],
+    ["Viggo Clipper V-017 Magnetic Blue",106348,159522],
+    ["Viggo Clipper V-017 Magnetic Gold",106348,159522],
+    ["Viggo Clipper V-027 Blast",121541,182311],
+    ["Viggo Trimmer V-028 Blast",113954,170930],
+    ["Viggo Clipper V-025 Volt Black",174724,262086],
+    ["Viggo Clipper V-025 Volt Gold",174724,262086],
+    ["Viggo Trimmer V-026 Volt Black",159531,239297],
+    ["Viggo Trimmer V-026 Volt Red",159531,239297],
+    ["Viggo Clipper V-025-A Volt Diamond 2026 Black",171272,256908],
+    ["Viggo Clipper V-025-A Volt Diamond 2026 Red",171272,256908],
+    ["Viggo Trimmer V-026-A Volt Diamond 2026 Black",148714,223071],
+    ["Viggo Trimmer V-026-A Volt Diamond 2026 Red",148714,223071],
+    "Repuestos y cuchillas",
+    ["Repuesto Shaver Kit Classic",12590,18885],
+    ["Repuesto Shaver V-003 Gold",15543,23315],
+    ["Repuesto Shaver V-004 Black",15543,23315],
+    ["Repuesto Shaver Sharp X",18460,27690],
+    ["Repuesto Shaver V-021 GO",9876,14814],
+    ["Repuesto Shaver Volt Diamond V-143 Red",22872,34308],
+    ["Cuchillas Taper Blade V-135 Valkiria",21414,32120],
+    ["Cuchillas Fade Blade V-136 Valkiria",21414,32120],
+    ["Cuchillas Trimmer Blade V-137 T-Valkiria",16909,25364],
+    ["Cuchillas Clipper Set Volt Diamond V-140",28041,42061],
+    ["Cuchillas Trimmer Set Volt Diamond V-141",17094,25641],
+    "Tijeras",
+    // kits Classic
+    ["Tijera Viggo Kit V-100 5.5'' Classic",54106,81159],
+    ["Tijera Viggo Kit V-101 6'' Classic",54106,81159],
+    ["Tijera Viggo Kit V-102 5.5'' Classic con diseño",54106,81159],
+    ["Tijera Viggo Kit V-102 5.5'' Black Edition",54106,81159],
+    ["Tijera Viggo Kit V-103 6'' Classic con diseño",54106,81159],
+    ["Tijera Viggo Kit V-103 6'' Black Edition",54106,81159],
+    ["Tijera Viggo Kit V-123 6.5'' Classic",54106,81159],
+    ["Tijera Viggo Kit V-124 7'' Classic",54106,81159],
+    ["Tijera Viggo Kit V-104 6'' Zurdo Classic",62432,93648],
+    // Tijeras — individuales Classic
+    ["Tijera Viggo V-143 FN 5.5''",25844,38766],
+    ["Tijera Viggo V-144 FN 6''",25844,38766],
+    ["Tijera Viggo V-145 Pulir 6'' 30T",25844,38766],
+    ["Tijera Viggo V-146 FN 5.5'' zurda",25844,38766],
+    ["Tijera Viggo V-147 FN 6'' zurda",25844,38766],
+    ["Tijera Viggo V-148 Pulir 6'' 30T zurda",25844,38766],
+    ["Tijera Viggo V-151 Microdentada 5.5''",25844,38766],
+    ["Tijera Viggo V-152 Microdentada 6''",25844,38766],
+    ["Tijera Viggo V-149 Cocodrilo by Rulo King",36459,54688],
+    ["Tijera Viggo V-150 Rubí by Rulo King",110760,166140],
+    // Tijeras — Prime 440C
+    ["Tijera Viggo V-105 5'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-106 5.5'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-107 6'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-108 5.5'' 440C Prime Gold",98761,148142],
+    ["Tijera Viggo V-109 6'' 440C Prime Gold",98761,148142],
+    ["Tijera Viggo V-110 5'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-111 5.5'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-112 6'' 440C Prime",98761,148142],
+    ["Tijera Viggo V-113 6'' Pulir 440C Prime",98761,148142],
+    ["Tijera Viggo V-114 6'' Zurdo 440C Prime",98761,148142],
+    // Tijeras — PRO+ VG10 / ediciones
+    ["Tijera Viggo V-115 5'' VG10 Pro+",140536,210804],
+    ["Tijera Viggo V-116 5.5'' VG10 Pro+",140536,210804],
+    ["Tijera Viggo V-117 5.5'' VG10 Unique",140536,210804],
+    ["Tijera Viggo V-118 6'' VG10 Unique",140536,210804],
+    ["Tijera Viggo V-119 Xaris 5'' 440C",110151,165226],
+    ["Tijera Viggo V-120 Xaris 5.5'' 440C",110151,165226],
+    ["Tijera Viggo V-121 Xaris 6.5'' 440C",110151,165226],
+    ["Tijera Viggo V-122 7'' VG10 by Rulo King",151372,227058],
+    ["Tijera Viggo V-127 Kaisen 5'' by Ema Medina",125528,188292],
+    ["Tijera Viggo V-128 Kaisen 5'' Pulir by Ema Medina",125528,188292],
+    "Secadores",
+    ["Secador Viggo V-210 Vortex 2",167118,250678],
+    ["Secador Viggo V-209 Rulo King",174724,262086],
+    ["Secador Viggo V-201 Tempesta",106348,159522],
+    ["Secador Viggo V-202 Invictus",91155,136733],
+    ["Secador Viggo V-203 Helix",75963,113944],
+    ["Secador Viggo V-205 Classic X",56968,85451],
+    ["Secador Viggo V-206 Classic Arena",45578,68367],
+    ["Secador Viggo V-206 Classic Pink",45578,68367],
+    ["Secador Viggo V-206 Classic White",45578,68367],
+    "Planchas",
+    ["Plancha Viggo V-207 Essentia Pink",36459,54688],
+    ["Plancha Viggo V-207 Essentia Arena",36459,54688],
+    ["Plancha Viggo V-207 Essentia White",36459,54688],
+    ["Plancha Viggo V-208 Essentia Titanium",91155,136733],
+    ["Plancha Viggo V-211 Essentia Mini",18995,28493],
+    "Accesorios",
+    ["Papel de cuello Viggo V-900 (20 tubos)",123073,184609],
+    ["Sujetadores de cabello Viggo V-088 x2",1237,1855],
+    ["Capa de corte Viggo V-089 blanca",11390,17085],
+    ["Capa de corte Viggo V-090 negra",11390,17085],
+    ["Capa de corte Viggo V-125 blanca (cuello silicona)",16706,25059],
+    ["Capa de corte Viggo V-126 negra (cuello silicona)",16706,25059],
+    ["Capa de corte Viggo V-129 Kaizen",16706,25059],
+    ["Capa de corte Viggo V-130 Rulo King",16706,25059],
+    ["Capa de corte Viggo V-131 Xaris",16706,25059],
+    ["Capa de corte Viggo V-134 Valkiria",11390,17085],
+    ["Capa de corte Viggo V-139 Volt 2026",16706,25059],
+    ["Alzas Viggo V-092 set x4",6830,10245],
+    ["Alzas Viggo V-093 set x2",5316,7975],
+    ["Filos de navaja Viggo V-094 x100",9119,13679],
+    // Productos propios de la barbería (de muestra — editar nombres/precios reales en Stock)
+    "Ceras y cuidado capilar",
+    ["Cera modeladora",3200,6000],
+    ["Pomada mate",3500,6500],
+    ["Gel fijación fuerte",2400,4500],
+    ["Aceite para barba",2600,5500],
+    ["Shampoo para barba",2800,5000],
+    ["Polvo texturizador",3000,5800]
+  ];
+  if(!read(K.prod,null) || parseInt(LS.getItem("uni_prodver")||"0",10)<CATALOGO_VER){
+    var _oldProd=read(K.prod,[]), _cat="Otros", _n=0, _prods=[];
+    VIGGO.forEach(function(p){
+      if(typeof p==="string"){ _cat=p; return; } // marcador de categoría
+      _n++;
+      // stock inicial demo por categoría (equipos pocos, consumibles más)
+      var cantDef=_cat==="Ceras y cuidado capilar"?10:_cat==="Accesorios"?6:2;
+      // si el producto ya existía, conservar cantidad y precios editados a mano
+      var prev=_oldProd.find(function(o){ return o.nombre===p[0]; });
+      _prods.push({id:"vg"+_n,nombre:p[0],may:prev?prev.may:p[1],sug:prev?prev.sug:p[2],
+        cat:_cat,cant:(prev&&prev.cant!=null)?prev.cant:cantDef,activo:true});
+    });
+    write(K.prod,_prods);
+    LS.setItem("uni_prodver",String(CATALOGO_VER));
+  }
+  // horarios POR DÍA: modo "corrido" (una franja) o "2 turnos" (doble franja, flag doble)
+  var defDias=function(){
+    var d={}; for(var i=0;i<7;i++){ var on=(i>=2&&i<=6); // demo: mar-sáb; miércoles de corrido
+      var corrido=(i===3);
+      d[i]={on:on, doble:on&&!corrido,
+        f1:on?(corrido?["10:00","20:00"]:["10:00","14:00"]):["",""],
+        f2:(on&&!corrido)?["15:00","20:00"]:["",""]}; }
+    return d;
+  };
+  // corte 45 + espacio 15 = 60 → los turnos arrancan SIEMPRE en hora en punto (10, 11, 12...)
+  if(!read(K.cfg,null)) write(K.cfg,{
+    days:[2,3,4,5,6], dias:defDias(), start:"10:00", end:"20:00", slotMin:45, gapMin:15, horizonDays:14, precioCorte:14000
+  });
+  // completar/forzar precioCorte + duración + gap + dias (demo)
+  var _c=read(K.cfg,{});
+  if(_c){ var _ch=false;
+    if(_c.precioCorte==null || demoOld){ _c.precioCorte=14000; _ch=true; }
+    if(_c.slotMin==null || demoOld){ _c.slotMin=45; _ch=true; }
+    if(_c.gapMin==null || demoOld){ _c.gapMin=15; _ch=true; }
+    if(demoOld){ _c.dias=defDias(); _c.days=[2,3,4,5,6]; _ch=true; }
+    else if(_c.dias==null){ // migrar config vieja: franja única global → por día
+      var dd={}; for(var i=0;i<7;i++){ var on=(_c.days||[]).indexOf(i)>-1;
+        dd[i]={on:on,doble:false,f1:on?[_c.start||"10:00",_c.end||"20:00"]:["",""],f2:["",""]}; }
+      _c.dias=dd; _ch=true;
+    } else { // asegurar el flag doble en configs previas
+      for(var k in _c.dias){ var dk=_c.dias[k];
+        if(dk.doble==null){ dk.doble=!!(dk.f2&&dk.f2[0]&&dk.f2[1]); _ch=true; } }
+    }
+    if(_c.francos==null){ _c.francos=[]; _ch=true; } // días puntuales que NO corta
+    if(_ch) write(K.cfg,_c);
+  }
+  // próxima ocurrencia (incluye hoy) de un día de semana dado, a tal hora — así los
+  // turnos demo caen SIEMPRE en días que atiende (mar-sáb según config)
+  var nextDow=function(dow,h,m){ var d=new Date(); d.setHours(h,m||0,0,0);
+    d.setDate(d.getDate()+((dow-d.getDay()+7)%7)); return d.toISOString(); };
+  if(!read(K.turnos,null) || demoOld){ var _tur=[
+    // Martes: 4 turnos (uno realizado, para ver el botón Borrar) — SIEMPRE en hora en punto
+    {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",servId:"s1",fecha:nextDow(2,10,0),estado:"realizado",precio:14000},
+    {id:uid(),nombre:"Lucas Ferreyra",tel:"5492284611002",servId:"s1",fecha:nextDow(2,11,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Ezequiel Paz",tel:"5492284611003",servId:"s1",fecha:nextDow(2,12,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Franco Díaz",tel:"5492284611009",servId:"s1",fecha:nextDow(2,13,0),estado:"confirmado",precio:14000},
+    // Miércoles: un solo turno
+    {id:uid(),nombre:"Tomás Vidal",tel:"5492284611007",servId:"s1",fecha:nextDow(3,16,0),estado:"confirmado",precio:14000},
+    // Jueves: 3 turnos
+    {id:uid(),nombre:"Iván Molina",tel:"5492284611008",servId:"s1",fecha:nextDow(4,10,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Julián Costa",tel:"5492284611004",servId:"s1",fecha:nextDow(4,11,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Bruno Vera",tel:"5492284611005",servId:"s1",fecha:nextDow(4,12,0),estado:"confirmado",precio:14000},
+    // Viernes: 5 turnos
+    {id:uid(),nombre:"Nahuel Sosa",tel:"5492284611006",servId:"s1",fecha:nextDow(5,10,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Agustín Rey",tel:"5492284611010",servId:"s1",fecha:nextDow(5,11,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Marcos Peña",tel:"5492284611011",servId:"s1",fecha:nextDow(5,12,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Santi López",tel:"5492284611012",servId:"s1",fecha:nextDow(5,13,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Facu Torres",tel:"5492284611013",servId:"s1",fecha:nextDow(5,15,0),estado:"confirmado",precio:14000},
+    // Sábado: 3 turnos
+    {id:uid(),nombre:"Pedro Aguirre",tel:"5492284611014",servId:"s1",fecha:nextDow(6,10,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Leo Núñez",tel:"5492284611015",servId:"s1",fecha:nextDow(6,11,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Dylan Soto",tel:"5492284611016",servId:"s1",fecha:nextDow(6,12,0),estado:"confirmado",precio:14000},
+    // turnos a más de 7 días (aparecen en "Más adelante", debajo del acordeón semanal)
+    {id:uid(),nombre:"Lautaro Vega",tel:"5492284611017",servId:"s1",fecha:atDay(10,11,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Ramiro Duarte",tel:"5492284611018",servId:"s1",fecha:atDay(16,16,0),estado:"confirmado",precio:14000},
+    // realizados anteriores (historial para filtros de Mensajes y balance)
+    {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",servId:"s1",fecha:atDay(-12,17,0),estado:"realizado",precio:8000},
+    {id:uid(),nombre:"Julián Costa",tel:"5492284611004",servId:"s2",fecha:atDay(-8,18,0),estado:"realizado",precio:10000},
+    {id:uid(),nombre:"Lucas Ferreyra",tel:"5492284611002",servId:"s1",fecha:atDay(-28,16,0),estado:"realizado",precio:8000},
+    {id:uid(),nombre:"Bruno Vera",tel:"5492284611005",servId:"s3",fecha:atDay(-35,19,0),estado:"realizado",precio:5000},
+    {id:uid(),nombre:"Nahuel Sosa",tel:"5492284611006",servId:"s1",fecha:atDay(-45,11,0),estado:"realizado",precio:8000}
+  ];
+  // historial demo: realizados repartidos en meses anteriores (para que la vista Año muestre movimiento)
+  var histNombres=["Martín Ríos","Lucas Ferreyra","Bruno Vera","Nahuel Sosa","Julián Costa"];
+  var histTels=["5492284611001","5492284611002","5492284611005","5492284611006","5492284611004"];
+  [64,72,93,100,124,130,158,165,190,196,205,215,225,240,255].forEach(function(off,k){
+    _tur.push({id:uid(),nombre:histNombres[k%5],tel:histTels[k%5],servId:"s1",
+      fecha:atDay(-off,15,0),estado:"realizado",precio:14000});
+  });
+  // servicio único "Corte" a precio plano
+  _tur.forEach(function(t){ t.servId="s1"; t.precio=14000; });
+  write(K.turnos,_tur); }
+  if(!read(K.ventas,null) || demoOld) write(K.ventas,[
+    {id:uid(),fecha:justNow(),cliente:"Juan Pérez",tel:"5492284622001",producto:"Cera modeladora",total:6000,costo:3200,pago:"Efectivo",tipo:"contado"},
+    {id:uid(),fecha:atDay(-2,13,0),cliente:"Diego Molina",tel:"5492284622002",producto:"Aceite para barba",total:5500,costo:2600,pago:"Transferencia",tipo:"contado"},
+    {id:uid(),fecha:atDay(-9,17,0),cliente:"Carlos Ruiz",tel:"5492284622003",producto:"Máquina Viggo Trimmer V-001",total:78000,costo:52000,pago:"Transferencia",tipo:"financiado",
+      cuotas:[{num:1,monto:26000,pagada:true,fecha:atDay(-9,17,0)},
+              {num:2,monto:26000,pagada:true,fecha:justNow()},
+              {num:3,monto:26000,pagada:false,fecha:null}]}
+  ]);
+  // ---- VIP demo: una activa, una por vencer, una vencida ----
+  if(!read(K.vip,null) || demoOld){
+    var _vips=[
+      {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",tipo:"vip3",total:3,usados:1,alta:atDay(-10,12),vence:addMonthIso(atDay(-10,12)),pago:"Efectivo",precio:vipPackPrice("vip3")},
+      {id:uid(),nombre:"Lucas Ferreyra",tel:"5492284611002",tipo:"vip4",total:4,usados:2,alta:atDay(-25,12),vence:addMonthIso(atDay(-25,12)),pago:"Transferencia",precio:vipPackPrice("vip4")},
+      {id:uid(),nombre:"Bruno Vera",tel:"5492284611005",tipo:"vip3",total:3,usados:3,alta:atDay(-40,12),vence:addMonthIso(atDay(-40,12)),pago:"Efectivo",precio:vipPackPrice("vip3")}
+    ];
+    write(K.vip,_vips);
+  }
+  // ---- Clientes: cartera construida desde los turnos y ventas existentes ----
+  // (conserva las notas ya escritas si el teléfono coincide)
+  if(!read(K.clientes,null) || demoOld){
+    var _prev=read(K.clientes,[]), _cl=[], _nowIso=new Date().toISOString();
+    var _up=function(nombre,tel,fecha){
+      tel=String(tel||"").replace(/\D/g,""); if(!tel) return;
+      if(!fecha||fecha>_nowIso) fecha=_nowIso; // turnos futuros no cuentan como "recién agregado"
+      var ex=null; for(var i=0;i<_cl.length;i++){ if(_cl[i].tel===tel){ ex=_cl[i]; break; } }
+      if(ex){ if(fecha && fecha>ex.creado) ex.creado=fecha; return; }
+      var old=null; for(var j=0;j<_prev.length;j++){ if(String(_prev[j].tel)===tel){ old=_prev[j]; break; } }
+      _cl.push({id:uid(),nombre:nombre||("+"+tel),tel:tel,notas:old?old.notas:"",creado:fecha||new Date().toISOString()});
+    };
+    read(K.turnos,[]).forEach(function(t){ _up(t.nombre,t.tel,t.fecha); });
+    read(K.ventas,[]).forEach(function(v){ _up(v.cliente!=="—"?v.cliente:"",v.tel,v.fecha); });
+    write(K.clientes,_cl);
+  }
+  if(demoOld) LS.setItem("uni_demover",String(DEMO_VER));
+}
+
+/* ---------- getters ---------- */
+var getServ = function(){ return read(K.serv,[]); };
+var getProd = function(){ return read(K.prod,[]); };
+var getTurnos = function(){ return read(K.turnos,[]); };
+var getVentas = function(){ return read(K.ventas,[]); };
+var getCfg = function(){ return read(K.cfg,{}); };
+var getVIP = function(){ return read(K.vip,[]); };
+var getClientes = function(){ return read(K.clientes,[]); };
+var servName = function(id){ var s=getServ().find(function(x){return x.id===id}); return s?s.nombre:"—"; };
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+function entrar(){
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  startApp();
+}
+/* mensajes de Firebase Auth en criollo */
+function authMsg(e){
+  var c=(e && e.code)||"";
+  if(c.indexOf("invalid-credential")>-1 || c.indexOf("wrong-password")>-1 || c.indexOf("user-not-found")>-1)
+    return "Mail o contraseña incorrectos.";
+  if(c.indexOf("invalid-email")>-1)        return "Ese mail no es válido.";
+  if(c.indexOf("too-many-requests")>-1)    return "Demasiados intentos. Esperá unos minutos.";
+  if(c.indexOf("network-request-failed")>-1) return "Sin conexión. Fijate el internet.";
+  if(c.indexOf("user-disabled")>-1)        return "Ese usuario está deshabilitado.";
+  return "No pude entrar. "+(c||e);
+}
+async function login(){
+  var pass=document.getElementById("pass").value||"";
+  if(!CLOUD_CFG){ // ---- modo DEMO: clave fija (portón, no seguridad real) ----
+    if(pass.trim().toLowerCase()==="unibaso"){ LS.setItem("uni_auth","1"); entrar(); }
+    else alert("Clave incorrecta.");
+    return;
+  }
+  // ---- modo NUBE: Firebase Auth ----
+  var email=(document.getElementById("email").value||"").trim();
+  if(!email || !pass){ alert("Poné tu mail y tu contraseña."); return; }
+  var btn=document.getElementById("btnEntrar"), txt=btn.textContent;
+  btn.disabled=true; btn.textContent="Entrando…";
+  try{
+    await authInit();
+    await CLOUD.am.signInWithEmailAndPassword(CLOUD.auth, email, pass);
+    CLOUD.user=CLOUD.auth.currentUser;
+    entrar();
+  }catch(e){ alert(authMsg(e)); }
+  finally{ btn.disabled=false; btn.textContent=txt; }
+}
+async function logout(){
+  if(CLOUD.auth && CLOUD.am){ try{ await CLOUD.am.signOut(CLOUD.auth); }catch(e){} }
+  LS.removeItem("uni_auth");
+  // el cache local es de la base real: al salir se limpia para no dejar datos en el aparato
+  if(CLOUD_CFG) Object.keys(K).forEach(function(k){ LS.removeItem(K[k]); });
+  location.reload();
+}
+["pass","email"].forEach(function(id){
+  document.getElementById(id).addEventListener("keydown",function(e){ if(e.key==="Enter") login(); });
+});
+
+/* ============================================================
+   TEMA
+   ============================================================ */
+function toggleTheme(){
+  var r=document.documentElement;
+  var cur=r.getAttribute("data-theme")|| (matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
+  var next=cur==="dark"?"light":"dark";
+  r.setAttribute("data-theme",next); LS.setItem("uni_theme",next);
+}
+(function(){ var t=LS.getItem("uni_theme"); if(t) document.documentElement.setAttribute("data-theme",t); })();
+
+/* ============================================================
+   NAV
+   ============================================================ */
+function go(name,btn){
+  document.querySelectorAll(".view").forEach(function(v){ v.classList.remove("active"); });
+  document.getElementById("view-"+name).classList.add("active");
+  document.querySelectorAll('nav.tabs button').forEach(function(b){ b.setAttribute("aria-selected","false"); });
+  if(btn) btn.setAttribute("aria-selected","true");
+  if(name==="vip") renderVIP();
+  if(name==="clientes") renderClientes();
+  if(name==="balance") renderBalance();
+  if(name==="stock") renderStock();
+  if(name==="mensajes") renderContacts();
+}
+function toggleForm(id){ document.getElementById(id).classList.toggle("hidden"); }
+
+/* ============================================================
+   TURNOS
+   ============================================================ */
+function fmtDia(f){
+  var s=new Date(f).toLocaleDateString("es-AR",{weekday:"short",day:"2-digit",month:"2-digit"});
+  return s.charAt(0).toUpperCase()+s.slice(1); // "Sáb 18/07"
+}
+function fmtHora(f){
+  return new Date(f).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}); // 24hs
+}
+var OPEN_DAY=null; // día (iso) desplegado en el acordeón
+function toMin(hhmm){ var p=(hhmm||"0:0").split(":"); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+function minToHH(m){ var h=Math.floor(m/60), mm=m%60; return (h<10?"0":"")+h+":"+(mm<10?"0":"")+mm; }
+function expandDay(dayIso){ OPEN_DAY=(OPEN_DAY===dayIso)?null:dayIso; renderTurnos(); }
+// config del día (con fallback a la config vieja de franja única global)
+function getDia(dow){
+  var c=getCfg();
+  if(c.dias && c.dias[dow]) return c.dias[dow];
+  var on=(c.days||[]).indexOf(dow)>-1;
+  return {on:on,doble:false,f1:on?[c.start||"10:00",c.end||"20:00"]:["",""],f2:["",""]};
+}
+// franjas válidas del día en minutos: [[ini,fin],...] — vacío si está cerrado.
+// La 2ª franja solo cuenta si el día está en modo "2 turnos" (doble).
+function franjasDia(dow){
+  var d=getDia(dow), out=[];
+  if(!d.on) return out;
+  var franjas=d.doble?[d.f1,d.f2]:[d.f1];
+  franjas.forEach(function(f){
+    if(f && f[0] && f[1] && toMin(f[1])>toMin(f[0])) out.push([toMin(f[0]),toMin(f[1])]);
+  });
+  return out;
+}
+// ¿la fecha (YYYY-MM-DD local) está marcada como franco?
+function esFranco(dayIso){ return (getCfg().francos||[]).indexOf(dayIso)>-1; }
+function estadoCls(t){ return (t.estado==="realizado"||t.estado==="confirmado")?"ok":"wait"; }
+
+function turnoRow(t,cls){
+  var wa=t.tel?'<a class="wa" target="_blank" href="https://wa.me/'+t.tel+'">💬</a>':"";
+  var acts='<div class="mini">'+wa;
+  if(t.estado!=="realizado"&&t.estado!=="cancelado"){
+    acts+='<button onclick="setEstado(\''+t.id+'\',\'realizado\')">Realizado</button>'+
+          '<button onclick="setEstado(\''+t.id+'\',\'cancelado\')">Cancelar</button>';
+  } else if(t.estado==="realizado"){
+    acts+='<button onclick="delTurno(\''+t.id+'\')">Borrar</button>';
+  }
+  // menú de 3 puntitos: hacer VIP al cliente desde el turno
+  var yaVip=!!vipByTel(t.tel);
+  var menu='<span class="menuwrap">'+
+    '<button class="menudots" title="Más" onclick="toggleTurnoMenu(event,\''+t.id+'\')">⋮</button>'+
+    '<span class="dmenu hidden" id="dm-'+t.id+'">'+
+      (yaVip
+        ? '<span class="info">Ya es cliente VIP</span>'
+        : '<button onclick="hacerVIPdesdeTurno(\''+t.id+'\',\'vip3\')">Hacer VIP ×3</button>'+
+          '<button onclick="hacerVIPdesdeTurno(\''+t.id+'\',\'vip4\')">Hacer VIP ×4</button>')+
+    '</span></span>';
+  acts+=menu+'</div>';
+  var tel=t.tel?' · +'+t.tel:"";
+  var vipTag=yaVip?'<span class="viptag--mini">VIP</span>':"";
+  var bono=t.vipConsumed?" · corte con bono VIP":"";
+  return '<span class="who">'+t.nombre+vipTag+'<small>'+servName(t.servId)+tel+bono+'</small></span>'+
+    '<span class="tacts"><span class="pill pill--'+cls+'">'+t.estado+'</span>'+acts+'</span>';
+}
+
+function renderTurnos(){
+  var cfg=getCfg(), el=document.getElementById("turnosList");
+  var today=new Date(); today.setHours(0,0,0,0);
+  var all=getTurnos().filter(function(t){ return t.estado!=="cancelado"; });
+  var out="";
+  for(var d=0; d<7; d++){
+    var day=new Date(today); day.setDate(today.getDate()+d);
+    var dayIso=iso(day);
+    var franco=esFranco(dayIso);
+    var atiende=!franco && franjasDia(day.getDay()).length>0;
+    var turnos=all.filter(function(t){ return iso(new Date(t.fecha))===dayIso; })
+      .sort(function(a,b){ return a.fecha<b.fecha?-1:1; });
+    var label=(d===0?"Hoy · ":d===1?"Mañana · ":"")+fmtDia(day);
+    var count=turnos.length
+      ? turnos.length+(turnos.length===1?" turno":" turnos")+(!atiende?(franco?" · franco":" · cerrado"):"")
+      : (franco?"Franco · no cortás":(!atiende?"Cerrado":"Sin turnos"));
+    var open=OPEN_DAY===dayIso;
+    out+='<div class="dayblock'+(open?" open":"")+'">'+
+      '<button class="dayhead" onclick="expandDay(\''+dayIso+'\')">'+
+      '<span><span class="dn">'+label+'</span><div class="dc">'+count+'</div></span>'+
+      '<span class="chev">▼</span></button>';
+    if(open){
+      // Desplegado: horario completo hora a hora, con o sin turnos
+      out+='<div class="dayfull">';
+      if(!atiende && !turnos.length){
+        out+='<div class="empty">'+(franco?"Franco: este día no cortás. (Se quita en Horarios.)":"No atendés este día. (Se cambia en la pestaña Horarios.)")+'</div>';
+      } else if(!atiende){
+        // día cerrado/franco pero con turnos cargados: mostrarlos igual
+        out+='<div class="empty" style="padding:12px 0 6px;text-align:left">'+(franco?"Día marcado como franco, pero tiene turnos:":"Día marcado como cerrado, pero tiene turnos:")+'</div>';
+        turnos.forEach(function(t){
+          var cls=t.estado==="realizado"?"ok":t.estado==="confirmado"?"ok":"wait";
+          out+='<div class="slot"><span class="sh">'+fmtHora(t.fecha)+'</span>'+turnoRow(t,cls)+'</div>';
+        });
+      } else {
+        // horario completo del día = sus franjas (una o dos), slot a slot
+        var step=(cfg.slotMin||60)+(cfg.gapMin||0);
+        var rows=[], shown={};
+        franjasDia(day.getDay()).forEach(function(fr){
+          for(var m=fr[0]; m<fr[1]; m+=step){
+            var slotTurnos=turnos.filter(function(t){
+              var dt=new Date(t.fecha), tm=dt.getHours()*60+dt.getMinutes();
+              return tm>=m && tm<m+step;
+            });
+            if(slotTurnos.length){
+              slotTurnos.forEach(function(t){
+                if(shown[t.id]) return;
+                shown[t.id]=1;
+                var dt=new Date(t.fecha);
+                rows.push({min:dt.getHours()*60+dt.getMinutes(),
+                  h:'<div class="slot"><span class="sh">'+fmtHora(t.fecha)+'</span>'+turnoRow(t,estadoCls(t))+'</div>'});
+              });
+            } else {
+              rows.push({min:m,h:'<div class="slot libre"><span class="sh">'+minToHH(m)+'</span>'+
+                '<span class="free">Libre</span><span></span></div>'});
+            }
+          }
+        });
+        // turnos cargados fuera de las franjas (ej: excepción a mano): mostrarlos igual en su horario
+        turnos.forEach(function(t){
+          if(shown[t.id]) return;
+          var dt=new Date(t.fecha);
+          rows.push({min:dt.getHours()*60+dt.getMinutes(),
+            h:'<div class="slot"><span class="sh">'+fmtHora(t.fecha)+'</span>'+turnoRow(t,estadoCls(t))+'</div>'});
+        });
+        rows.sort(function(a,b){return a.min-b.min;});
+        out+=rows.map(function(r){return r.h;}).join("");
+      }
+      out+='</div>';
+    } else if(turnos.length){
+      // Colapsado: hora + nombre de cada turno
+      out+='<div class="daymini">'+turnos.map(function(t){
+        return '<span><b>'+fmtHora(t.fecha)+'</b>'+t.nombre+'</span>';
+      }).join("")+'</div>';
+    }
+    out+='</div>';
+  }
+  // turnos a MÁS de 7 días: no entran al acordeón semanal → lista aparte con fecha y día exactos
+  var lim=new Date(today); lim.setDate(today.getDate()+7);
+  var lejanos=all.filter(function(t){ return new Date(t.fecha)>=lim; })
+    .sort(function(a,b){ return a.fecha<b.fecha?-1:1; });
+  if(lejanos.length){
+    out+='<div class="dayblock futblock"><div class="dayhead" style="cursor:default">'+
+      '<span><span class="dn">Más adelante</span><div class="dc">'+lejanos.length+
+      (lejanos.length===1?' turno':' turnos')+' a más de 7 días</div></span></div>'+
+      '<div class="dayfull">'+lejanos.map(function(t){
+        return '<div class="slot fslot"><span class="fwhen"><span class="fd">'+fmtDia(t.fecha)+'</span>'+
+          '<b class="fh">'+fmtHora(t.fecha)+'</b></span>'+turnoRow(t,estadoCls(t))+'</div>';
+      }).join("")+'</div></div>';
+  }
+  el.innerHTML=out;
+}
+function setEstado(id,estado){
+  var arr=getTurnos().map(function(t){
+    if(t.id===id){
+      // al marcar realizado: si el cliente es VIP con bonos, se descuenta uno (corte cubierto)
+      if(estado==="realizado" && t.estado!=="realizado" && !t.vipConsumed){
+        var vp=consumeVipBono(t.tel);
+        if(vp){ t.vipConsumed=true; t.vipPrice=vp; }
+      }
+      t.estado=estado;
+    }
+    return t;
+  });
+  write(K.turnos,arr); renderTurnos(); renderBalance();
+}
+function delTurno(id){
+  if(confirm("¿Borrar este turno? (Si estaba realizado, deja de contar en el Balance.)")){
+    var t=getTurnos().find(function(x){return x.id===id;});
+    if(t && t.vipConsumed) refundVipBono(t.tel); // devolver el bono usado
+    write(K.turnos,getTurnos().filter(function(x){return x.id!==id;}));
+    renderTurnos(); renderBalance();
+  }
+}
+function addTurno(){
+  var nombre=val("t_nombre"), tel=val("t_tel"), servId=val("t_serv"),
+      fecha=val("t_fecha"), hora=val("t_hora");
+  if(!nombre||!fecha||!hora){ alert("Completá nombre, fecha y hora."); return; }
+  var s=getServ().find(function(x){return x.id===servId});
+  var dt=new Date(fecha+"T"+hora);
+  var arr=getTurnos();
+  arr.push({id:uid(),nombre:nombre,tel:tel,servId:servId,fecha:dt.toISOString(),estado:"confirmado",precio:s?s.precio:0});
+  write(K.turnos,arr);
+  upsertCliente(nombre,tel); // el cliente entra a la cartera
+  ["t_nombre","t_tel"].forEach(function(i){document.getElementById(i).value="";});
+  toggleForm("turnoForm"); renderTurnos();
+}
+
+/* ============================================================
+   VENTAS
+   ============================================================ */
+/* cobrado / saldo de una venta */
+function ventaCobrado(v){
+  if(v.tipo==="financiado" && v.cuotas)
+    return v.cuotas.filter(function(c){return c.pagada;}).reduce(function(s,c){return s+(c.monto||0);},0);
+  return v.total||0; // contado
+}
+function ventaSaldo(v){ return (v.total||0)-ventaCobrado(v); }
+
+function toggleCuotas(){
+  var fin=val("v_tipo")==="financiado";
+  document.getElementById("cuotasFields").classList.toggle("hidden",!fin);
+}
+function onProdName(){
+  var name=val("v_prod_txt").toLowerCase();
+  var p=getProd().find(function(x){return x.nombre.toLowerCase()===name;});
+  if(p){ document.getElementById("v_total").value=p.sug; document.getElementById("v_costo").value=p.may; }
+  else { document.getElementById("v_costo").value=""; }
+}
+function addVenta(){
+  var cliente=val("v_cliente"), tel=val("v_tel").replace(/\D/g,""), producto=val("v_prod_txt"),
+      total=parseInt(val("v_total")||"0",10),
+      pago=val("v_pago"), tipo=val("v_tipo"), costo=parseInt(val("v_costo")||"0",10);
+  if(!producto||!total){ alert("Completá producto y total."); return; }
+  var v={id:uid(),fecha:new Date().toISOString(),cliente:cliente||"—",tel:tel||null,producto:producto,
+    total:total,costo:costo,pago:pago,tipo:tipo};
+  // si el producto está en el catálogo, descontar 1 del stock
+  var pr=getProd().find(function(x){return x.nombre.toLowerCase()===producto.toLowerCase();});
+  if(pr){
+    v.prodId=pr.id;
+    if((pr.cant||0)<=0) alert("Ojo: \""+pr.nombre+"\" figura sin stock (queda en 0).");
+    write(K.prod, getProd().map(function(x){
+      if(x.id===pr.id && (x.cant||0)>0) x.cant--;
+      return x;
+    }));
+    renderStock();
+  }
+  if(tipo==="financiado"){
+    var n=Math.max(2,parseInt(val("v_ncuotas")||"2",10));
+    var mc=parseInt(val("v_montocuota")||"0",10)||Math.round(total/n);
+    var primera=document.getElementById("v_primera").checked;
+    v.cuotas=[];
+    for(var i=1;i<=n;i++){
+      var monto=(i===n)?(total-mc*(n-1)):mc; // la última ajusta el resto
+      v.cuotas.push({num:i,monto:monto,pagada:(i===1&&primera),fecha:(i===1&&primera)?new Date().toISOString():null});
+    }
+  }
+  var arr=getVentas(); arr.push(v); write(K.ventas,arr);
+  if(tel) upsertCliente(cliente,tel); // el comprador entra a la cartera
+  ["v_cliente","v_tel","v_prod_txt","v_total","v_costo","v_montocuota"].forEach(function(i){document.getElementById(i).value="";});
+  document.getElementById("v_primera").checked=false;
+  document.getElementById("v_tipo").value="contado"; toggleCuotas();
+  toggleForm("ventaForm"); renderVentas(); renderBalance();
+}
+function cobrarCuota(id){
+  var arr=getVentas().map(function(v){
+    if(v.id===id && v.cuotas){
+      var next=v.cuotas.find(function(c){return !c.pagada;});
+      if(next){ next.pagada=true; next.fecha=new Date().toISOString(); }
+    }
+    return v;
+  });
+  write(K.ventas,arr); renderVentas(); renderBalance();
+}
+function renderVentas(){
+  var list=getVentas().slice().sort(function(a,b){ return a.fecha<b.fecha?1:-1; });
+  var el=document.getElementById("ventasList");
+  if(!list.length){ el.innerHTML='<div class="empty">Sin ventas cargadas.</div>'; return; }
+  el.innerHTML=list.map(function(v){
+    var f=new Date(v.fecha).toLocaleDateString("es-AR",{day:"2-digit",month:"short"});
+    var isFin=v.tipo==="financiado" && v.cuotas;
+    var status, fin="";
+    if(isFin){
+      var pag=v.cuotas.filter(function(c){return c.pagada;}).length, tot=v.cuotas.length;
+      var done=pag>=tot, saldo=ventaSaldo(v);
+      status='<span class="pill pill--'+(done?"ok":"wait")+'">'+pag+'/'+tot+' cuotas'+(done?" · saldada":"")+'</span>';
+      fin='<div class="vfin"><span class="info">Saldo por cobrar <b>'+money(saldo)+'</b> · '+
+        v.cuotas.length+' cuotas de '+money(v.cuotas[0].monto)+'</span>'+
+        (done?'':'<button class="btn btn--sm" onclick="cobrarCuota(\''+v.id+'\')">Cobrar cuota</button>')+'</div>';
+    } else {
+      status='<span class="pill pill--ok">Pagado</span>';
+    }
+    var tel=v.tel?' · <span class="tnum">+'+v.tel+'</span>':"";
+    var wa=v.tel?'<a class="wa" target="_blank" href="https://wa.me/'+v.tel+'">💬 Contactar</a>':"";
+    return '<div class="vrow"><div class="vmain"><span class="vcli">'+v.cliente+'</span>'+
+      '<small>'+v.producto+' · '+v.pago+' · '+f+tel+'</small></div>'+
+      '<span class="vtot">'+money(v.total)+'</span>'+
+      '<div class="vstatus">'+status+wa+'<button class="mini-x" onclick="delVenta(\''+v.id+'\')" title="Borrar">✕</button></div>'+
+      fin+'</div>';
+  }).join("");
+}
+function delVenta(id){
+  if(!confirm("¿Borrar esta venta?")) return;
+  var v=getVentas().find(function(x){return x.id===id;});
+  // devolver la unidad al stock si la venta había descontado una
+  if(v && v.prodId){
+    write(K.prod, getProd().map(function(p){ if(p.id===v.prodId) p.cant=(p.cant||0)+1; return p; }));
+    renderStock();
+  }
+  write(K.ventas,getVentas().filter(function(x){return x.id!==id;}));
+  renderVentas(); renderBalance();
+}
+
+/* ============================================================
+   BALANCE
+   ============================================================ */
+var PERIOD="hoy";
+var HIST_YEAR=null; // año mostrado en el historial (null = año actual)
+function histYear(){ return HIST_YEAR!=null?HIST_YEAR:new Date().getFullYear(); }
+function periodStart(p){
+  var d=new Date(); d.setHours(0,0,0,0);
+  if(p==="hoy") return d;
+  if(p==="semana"){ var wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return d; } // lunes
+  if(p==="mes"){ d.setDate(1); return d; }
+  if(p==="anio"){ return new Date(histYear(),0,1); }
+  return d;
+}
+function setPeriod(p,btn){
+  PERIOD=p;
+  if(p==="anio" && HIST_YEAR==null) HIST_YEAR=new Date().getFullYear();
+  document.querySelectorAll("#balSeg button").forEach(function(b){ b.setAttribute("aria-pressed","false"); });
+  if(btn) btn.setAttribute("aria-pressed","true");
+  renderBalance();
+}
+// GANANCIA y desglose para un rango [start, end): reutilizable por el período actual y por cada mes
+function statsPeriodo(start,end){
+  var inP=function(f){ if(!f) return false; var d=new Date(f); return d>=start && d<end; };
+  // Cortes realizados (los cubiertos por bono VIP suman $0: esa plata entró con la membresía)
+  var cortesArr=getTurnos().filter(function(t){ return t.estado==="realizado" && inP(t.fecha); });
+  var cortes=cortesArr.reduce(function(s,t){return s+(t.vipConsumed?0:(t.precio||0));},0);
+  // Membresías VIP pagadas (por fecha de alta/renovación)
+  var vipIng=getVIP().filter(function(v){ return inP(v.alta); })
+    .reduce(function(s,v){ return s+(v.precio!=null?v.precio:vipPackPrice(v.tipo)); },0);
+  // Ventas COBRADAS: contado por fecha de venta; financiadas cuota a cuota (costo prorrateado)
+  var vBruto=0, vCosto=0, ventasN=0;
+  getVentas().forEach(function(v){
+    if(v.tipo==="financiado" && v.cuotas){
+      var cob=v.cuotas.filter(function(c){return c.pagada && inP(c.fecha);})
+        .reduce(function(s,c){return s+(c.monto||0);},0);
+      if(cob>0){ vBruto+=cob; vCosto+=Math.round((v.costo||0)*cob/(v.total||1)); ventasN++; }
+    } else if(inP(v.fecha)){ vBruto+=v.total||0; vCosto+=v.costo||0; ventasN++; }
+  });
+  var vGan=vBruto-vCosto;
+  return {cortes:cortes,cortesN:cortesArr.length,vipIng:vipIng,vBruto:vBruto,vCosto:vCosto,
+    vGan:vGan,ventasN:ventasN,ganancia:cortes+vipIng+vGan};
+}
+function renderBalance(){
+  var now=new Date(), start, end;
+  if(PERIOD==="anio"){
+    var y=histYear();
+    start=new Date(y,0,1);
+    end=new Date(Math.min(now.getTime()+1, new Date(y+1,0,1).getTime())); // hasta hoy, no el futuro
+    set("balLabel", String(y));
+  } else {
+    start=periodStart(PERIOD); end=new Date(now.getTime()+1);
+    set("balLabel", PERIOD==="hoy"?"Hoy":PERIOD==="semana"?"Esta semana":"Este mes");
+  }
+  var st=statsPeriodo(start,end);
+  var porCobrar=getVentas().reduce(function(s,v){ return s+ventaSaldo(v); },0); // cuotas pendientes (global)
+  set("balBruto",money(st.ganancia)); set("balCortes",money(st.cortes)); set("balVip",money(st.vipIng));
+  set("eqBruto",money(st.vBruto)); set("eqCosto",money(st.vCosto)); set("eqGan",money(st.vGan));
+  set("kCortesN",st.cortesN); set("kVentasN",st.ventasN);
+  set("kBruto",money(st.cortes+st.vipIng+st.vBruto)); set("kPorCobrar",money(porCobrar));
+  // historial mes a mes: solo en la vista Año
+  var hist=document.getElementById("anioHist");
+  if(PERIOD==="anio"){ hist.classList.remove("hidden"); renderHistorial(); }
+  else hist.classList.add("hidden");
+}
+function cambiarAnio(n){ HIST_YEAR=histYear()+n; renderBalance(); }
+function renderHistorial(){
+  var y=histYear(), now=new Date();
+  set("histYear", String(y));
+  var meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  var vals=[], total=0;
+  for(var m=0;m<12;m++){ var st=statsPeriodo(new Date(y,m,1), new Date(y,m+1,1)); vals.push(st.ganancia); total+=st.ganancia; }
+  var max=Math.max.apply(null, vals.concat([1]));
+  var thisY=now.getFullYear(), thisM=now.getMonth();
+  var bars=vals.map(function(g,m){
+    var futuro=(y>thisY)||(y===thisY && m>thisM);
+    var cls="mbar"+(g<=0?" zero":"")+((y===thisY&&m===thisM)?" actual":"");
+    var pct=max>0?Math.round(g/max*100):0;
+    return '<div class="'+cls+'"><span class="mm">'+meses[m]+'</span>'+
+      '<span class="track">'+(futuro?'':'<span class="fillb" style="width:'+pct+'%"></span>')+'</span>'+
+      '<span class="amt">'+(futuro?'—':money(g))+'</span></div>';
+  }).join("");
+  document.getElementById("histBars").innerHTML=
+    '<div class="histtot"><span class="lbl">Total '+y+'</span><span class="amt">'+money(total)+'</span></div>'+bars;
+}
+
+/* ============================================================
+   CLIENTES (cartera de la barbería — cortes y ventas)
+   ============================================================ */
+var OPEN_CLI=null; // cliente con las notas desplegadas
+var escHtml=function(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+// alta/actualización silenciosa: la usan turnos, ventas y VIP para mantener la cartera al día
+// (el bot de n8n hará lo mismo al agendar clientes nuevos)
+function upsertCliente(nombre,tel,fecha){
+  var t=String(tel||"").replace(/\D/g,""); if(!t) return;
+  var nowIso=new Date().toISOString();
+  if(!fecha||fecha>nowIso) fecha=nowIso; // nunca en el futuro (turnos por venir)
+  var arr=getClientes();
+  var ex=arr.find(function(c){ return String(c.tel)===t; });
+  if(ex){
+    if(nombre && (!ex.nombre || ex.nombre.charAt(0)==="+")) ex.nombre=nombre;
+    ex.creado=(fecha>ex.creado)?fecha:ex.creado;
+  } else {
+    arr.push({id:uid(),nombre:nombre||("+"+t),tel:t,notas:"",creado:fecha});
+  }
+  write(K.clientes,arr);
+}
+function addCliente(){
+  var nombre=val("c_nombre"), tel=val("c_tel").replace(/\D/g,"");
+  if(!nombre||!tel){ alert("Completá nombre y WhatsApp."); return; }
+  if(getClientes().some(function(c){return String(c.tel)===tel;})){
+    alert("Ese número ya está en la lista."); return;
+  }
+  upsertCliente(nombre,tel);
+  document.getElementById("c_nombre").value=""; document.getElementById("c_tel").value="";
+  toggleForm("cliForm"); renderClientes();
+}
+function delCliente(id){
+  if(!confirm("¿Borrar este cliente de la lista? (No borra sus turnos ni ventas.)")) return;
+  write(K.clientes,getClientes().filter(function(c){return c.id!==id;}));
+  renderClientes();
+}
+function toggleNotas(id){ OPEN_CLI=(OPEN_CLI===id)?null:id; renderClientes(); }
+function saveNota(id,v){
+  write(K.clientes,getClientes().map(function(c){ if(c.id===id) c.notas=String(v); return c; }));
+}
+function renderClientes(){
+  var toks=normTxt(val("cliSearch")).split(/\s+/).filter(Boolean);
+  var list=getClientes().filter(function(c){
+    if(!toks.length) return true;
+    var n=normTxt(c.nombre), t=String(c.tel);
+    return toks.every(function(k){ return n.indexOf(k)>-1 || t.indexOf(k)>-1; });
+  }).sort(function(a,b){ return a.creado<b.creado?1:-1; }); // más reciente primero
+  var total=getClientes().length;
+  set("cliCount", total+(total===1?" cliente":" clientes"));
+  var el=document.getElementById("clientesList");
+  if(!el) return;
+  if(!list.length){
+    el.innerHTML='<div class="empty">'+(toks.length?"No hay clientes que coincidan.":"Todavía no hay clientes. El bot los va a ir sumando solo, o cargalos con \"+ Nuevo cliente\".")+'</div>';
+    return;
+  }
+  el.innerHTML=list.map(function(c){
+    var vip=vipByTel(c.tel);
+    var vipTag=vip?'<span class="viptag--mini">'+vipLabel(vip.tipo)+'</span>':"";
+    var open=OPEN_CLI===c.id;
+    var notaDot=(c.notas&&c.notas.trim())?" ●":"";
+    var out='<div class="crow"><div class="cn">'+escHtml(c.nombre)+vipTag+
+      '<small class="tnum">+'+c.tel+'</small></div>'+
+      '<div class="cacts">'+
+        '<a target="_blank" href="https://wa.me/'+c.tel+'" title="WhatsApp">💬 Contactar</a>'+
+        '<button onclick="toggleNotas(\''+c.id+'\')">Notas'+notaDot+' '+(open?"▲":"▼")+'</button>'+
+        '<button class="danger" onclick="delCliente(\''+c.id+'\')">Borrar</button>'+
+      '</div></div>';
+    if(open){
+      out+='<div class="cnotes"><textarea placeholder="Notas de '+escHtml(c.nombre)+'... (ej: le gusta el fade bajo, avisar promos de ceras)" '+
+        'onchange="saveNota(\''+c.id+'\',this.value)">'+escHtml(c.notas)+'</textarea>'+
+        '<div class="hintn">Se guarda solo al salir del campo.</div></div>';
+    }
+    return out;
+  }).join("");
+}
+
+/* ============================================================
+   VIP (membresías — packs prepagos de cortes con descuento)
+   ============================================================ */
+var VIP_DESC={vip3:0.20, vip4:0.23};   // descuento del pack
+var VIP_CORTES={vip3:3, vip4:4};       // cortes que incluye
+function vipLabel(tipo){ return tipo==="vip4"?"VIP 4":"VIP 3"; }
+function precioCorte(){ var c=getCfg(); return c.precioCorte||14000; }
+function vipPackPrice(tipo){ return Math.round(precioCorte()*VIP_CORTES[tipo]*(1-VIP_DESC[tipo])); }
+// mismo día del mes siguiente (si el mes no tiene ese día, cae al último — ej. 31 → 30)
+function addMonthIso(isoStr){ var d=new Date(isoStr); var day=d.getDate(); d.setMonth(d.getMonth()+1);
+  if(d.getDate()<day) d.setDate(0); return d.toISOString(); }
+function normTel(t){ return t?String(t).replace(/\D/g,""):""; }
+function fmtShort(f){ return new Date(f).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}); }
+function diasVence(v){ return daysBetween(new Date(), new Date(v.vence)); }
+function vipEstado(v){
+  var dias=diasVence(v);
+  if(new Date()>new Date(v.vence)) return {k:"vencida",label:"Vencida",cls:"stop",dias:dias};
+  if(dias<=7) return {k:"porvencer",label:"Por vencer",cls:"wait",dias:dias};
+  return {k:"activa",label:"Activa",cls:"ok",dias:dias};
+}
+function vipByTel(tel){
+  var t=normTel(tel); if(!t) return null;
+  return getVIP().find(function(v){ return normTel(v.tel)===t; })||null;
+}
+// descuenta un bono del VIP que coincide por teléfono (solo si está vigente y le quedan).
+// devuelve el precio EFECTIVO de ese corte (pack ÷ cortes) para el Balance, o 0 si no consumió.
+function consumeVipBono(tel){
+  var t=normTel(tel); if(!t) return 0; var price=0;
+  var arr=getVIP().map(function(v){
+    if(!price && normTel(v.tel)===t && vipEstado(v).k!=="vencida" && v.usados<v.total){
+      v.usados++; price=Math.round(vipPackPrice(v.tipo)/v.total);
+    }
+    return v;
+  });
+  if(price) write(K.vip,arr);
+  return price;
+}
+function refundVipBono(tel){
+  var t=normTel(tel); if(!t) return; var done=false;
+  var arr=getVIP().map(function(v){
+    if(!done && normTel(v.tel)===t && v.usados>0){ v.usados--; done=true; }
+    return v;
+  });
+  if(done) write(K.vip,arr);
+}
+// única fuente del precio del corte: cfg.precioCorte, sincronizado con el servicio "Corte".
+// Se puede editar desde Horarios o desde la pestaña VIP; ambos llaman acá.
+function aplicarPrecioCorte(p){
+  p=parseInt(p||"0",10)||0;
+  var c=getCfg(); c.precioCorte=p; write(K.cfg,c);
+  write(K.serv, getServ().map(function(s){ if((s.nombre||"").toLowerCase()==="corte") s.precio=p; return s; }));
+  fillSelects(); renderTurnos();
+  return p;
+}
+function saveVipPrecio(){ aplicarPrecioCorte(val("vip_precio")); renderVIP(); }
+function saveCortePrecio(){ aplicarPrecioCorte(val("h_precio")); renderVIP(); }
+function vipFormPreview(){
+  var tipo=val("vp_tipo")||"vip3", el=document.getElementById("vipPreview");
+  if(!el) return;
+  el.innerHTML="Pack <b>"+vipLabel(tipo)+"</b>: "+VIP_CORTES[tipo]+" cortes · precio "+
+    "<b style='color:var(--dollar)'>"+money(vipPackPrice(tipo))+"</b> ("+(VIP_DESC[tipo]*100)+
+    "% off sobre "+money(precioCorte())+"/corte). Vence 1 mes después del alta.";
+}
+function addVIP(){
+  var nombre=val("vp_nombre"), tel=normTel(val("vp_tel")), tipo=val("vp_tipo"),
+      altaD=val("vp_alta"), pago=val("vp_pago");
+  if(!nombre){ alert("Poné el nombre del cliente."); return; }
+  var alta = altaD ? new Date(altaD+"T12:00:00").toISOString() : new Date().toISOString();
+  var v={id:uid(),nombre:nombre,tel:tel||null,tipo:tipo,total:VIP_CORTES[tipo],usados:0,
+    alta:alta,vence:addMonthIso(alta),pago:pago,precio:vipPackPrice(tipo)};
+  var arr=getVIP(); arr.push(v); write(K.vip,arr);
+  if(tel) upsertCliente(nombre,tel); // el VIP también entra a la cartera
+  ["vp_nombre","vp_tel"].forEach(function(i){document.getElementById(i).value="";});
+  toggleForm("vipForm"); renderVIP(); renderBalance();
+}
+function usarBono(id){
+  var v=getVIP().find(function(x){return x.id===id;});
+  if(v && v.usados>=v.total){ alert("Ya usó todos los bonos de esta tarjeta."); return; }
+  write(K.vip,getVIP().map(function(x){ if(x.id===id) x.usados++; return x; }));
+  renderVIP();
+}
+function devolverBono(id){
+  write(K.vip,getVIP().map(function(x){ if(x.id===id && x.usados>0) x.usados--; return x; }));
+  renderVIP();
+}
+function renovarVIP(id){
+  if(!confirm("¿Renovar esta tarjeta? Arranca un nuevo mes desde hoy con los bonos completos y se registra el cobro del pack.")) return;
+  var now=new Date().toISOString(), renovada=null;
+  var arr=getVIP().map(function(v){
+    if(v.id===id){ v.alta=now; v.vence=addMonthIso(now); v.usados=0; v.total=VIP_CORTES[v.tipo]; v.precio=vipPackPrice(v.tipo); renovada=v; }
+    return v;
+  });
+  write(K.vip,arr);
+  renderVIP(); renderBalance();
+}
+function delVIP(id){
+  if(!confirm("¿Borrar esta tarjeta VIP?")) return;
+  write(K.vip,getVIP().filter(function(v){return v.id!==id;}));
+  renderVIP(); renderTurnos(); renderBalance();
+}
+/* menú de 3 puntitos en cada turno → convertir al cliente en VIP */
+function closeTurnoMenus(){ document.querySelectorAll(".dmenu").forEach(function(x){x.classList.add("hidden");}); }
+function toggleTurnoMenu(ev,id){
+  ev.stopPropagation();
+  var m=document.getElementById("dm-"+id); if(!m) return;
+  var open=!m.classList.contains("hidden");
+  closeTurnoMenus();
+  if(!open) m.classList.remove("hidden");
+}
+function hacerVIPdesdeTurno(turnoId,tipo){
+  var t=getTurnos().find(function(x){return x.id===turnoId;});
+  if(!t) return;
+  if(vipByTel(t.tel)){ alert(t.nombre+" ya es cliente VIP."); closeTurnoMenus(); return; }
+  var alta=new Date().toISOString();
+  var v={id:uid(),nombre:t.nombre,tel:t.tel||null,tipo:tipo,total:VIP_CORTES[tipo],usados:0,
+    alta:alta,vence:addMonthIso(alta),pago:"—",precio:vipPackPrice(tipo)};
+  var arr=getVIP(); arr.push(v); write(K.vip,arr);
+  closeTurnoMenus(); renderTurnos(); renderBalance();
+  alert(t.nombre+" ahora es "+vipLabel(tipo)+" — vence el "+fmtShort(v.vence)+
+    ". Ajustá el medio de pago en la pestaña VIP.");
+}
+function vipCardHtml(v){
+  var est=vipEstado(v), rem=Math.max(0,v.total-v.usados), dots="";
+  for(var i=0;i<v.total;i++) dots+='<span class="dot'+(i<v.usados?" used":"")+'"></span>';
+  var estTxt = est.k==="vencida" ? ("venció hace "+Math.abs(est.dias)+" días")
+             : est.k==="porvencer" ? ("vence en "+est.dias+(est.dias===1?" día":" días"))
+             : (est.dias+" días restantes");
+  var wa=v.tel?'<a href="https://wa.me/'+v.tel+'" target="_blank" title="WhatsApp">💬</a>':"";
+  return '<div class="vipcard vip--'+est.cls+'">'+
+    '<div class="viptop"><div><span class="vipname">'+v.nombre+'</span>'+
+      (v.tel?'<small class="tnum">+'+v.tel+'</small>':'')+'</div>'+
+      '<span class="viptag">'+vipLabel(v.tipo)+'</span></div>'+
+    '<div class="vipbonos"><span class="dots">'+dots+'</span>'+
+      '<span class="rem">Quedan <b>'+rem+'</b> de '+v.total+' cortes</span></div>'+
+    '<div class="vipdates">Alta '+fmtShort(v.alta)+'<span class="sep">·</span>Vence '+fmtShort(v.vence)+
+      '<span class="pill pill--'+est.cls+'">'+est.label+'</span>'+
+      '<span class="muted">'+estTxt+'</span></div>'+
+    '<div class="vipfoot"><span class="pack">Pack <b>'+money(vipPackPrice(v.tipo))+'</b> · '+v.pago+'</span>'+
+      '<span class="vipacts">'+wa+
+        '<button onclick="usarBono(\''+v.id+'\')">− Usar corte</button>'+
+        '<button onclick="devolverBono(\''+v.id+'\')">+ Devolver</button>'+
+        '<button onclick="renovarVIP(\''+v.id+'\')">Renovar</button>'+
+        '<button class="danger" onclick="delVIP(\''+v.id+'\')">Borrar</button>'+
+      '</span></div></div>';
+}
+function renderVIP(){
+  var pin=document.getElementById("vip_precio");
+  if(pin && document.activeElement!==pin) pin.value=precioCorte();
+  set("packInfo","VIP 3 = "+money(vipPackPrice("vip3"))+"  ·  VIP 4 = "+money(vipPackPrice("vip4")));
+  vipFormPreview();
+  var list=getVIP().slice().sort(function(a,b){ return diasVence(a)-diasVence(b); }); // más urgente primero
+  var el=document.getElementById("vipList");
+  if(!list.length){ el.innerHTML='<div class="card"><div class="empty">Todavía no hay clientes VIP. Tocá "+ Nuevo VIP" para dar de alta una tarjeta.</div></div>'; return; }
+  el.innerHTML=list.map(vipCardHtml).join("");
+}
+
+/* ============================================================
+   STOCK (catálogo editable — sin cantidades)
+   ============================================================ */
+var normTxt=function(s){ return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); };
+function renderStock(){
+  // búsqueda por palabras y sin tildes; matchea PRODUCTO específico primero
+  // (ej: "tijera 5.5", "clipper gold", "cera") y solo si ningún nombre coincide, busca por categoría
+  var toks=normTxt(val("stockSearch")).split(/\s+/).filter(Boolean);
+  var all=getProd();
+  var list;
+  if(!toks.length){ list=all; }
+  else {
+    var match=function(txt){ var n=normTxt(txt); return toks.every(function(t){ return n.indexOf(t)>-1; }); };
+    var porNombre=all.filter(function(p){ return match(p.nombre); });
+    list=porNombre.length ? porNombre : all.filter(function(p){ return match(p.cat||""); });
+  }
+  var el=document.getElementById("stockList");
+  if(!list.length){ el.innerHTML='<div class="empty">No hay productos que coincidan.</div>'; return; }
+  var out="", lastCat=null;
+  list.forEach(function(p){
+    var cat=p.cat||"Otros";
+    if(cat!==lastCat){
+      var enCat=list.filter(function(x){return (x.cat||"Otros")===cat;});
+      var unidades=enCat.reduce(function(s,x){return s+(x.cant||0);},0);
+      out+='<div class="scat">'+cat+'<small>'+unidades+' unid.</small></div>';
+      lastCat=cat;
+    }
+    var cant=p.cant!=null?p.cant:0;
+    var open=OPEN_PROD===p.id;
+    out+='<div class="srow">'+
+      '<input value="'+p.nombre.replace(/"/g,"&quot;")+'" onchange="saveProd(\''+p.id+'\',\'nombre\',this.value)">'+
+      '<input type="number" class="tnum'+(cant<=0?' agotado':'')+'" value="'+cant+'" min="0" step="1" onchange="saveProd(\''+p.id+'\',\'cant\',this.value)">'+
+      '<input type="number" class="tnum" value="'+p.may+'" min="0" step="100" onchange="saveProd(\''+p.id+'\',\'may\',this.value)">'+
+      '<input type="number" class="tnum" value="'+p.sug+'" min="0" step="100" onchange="saveProd(\''+p.id+'\',\'sug\',this.value)">'+
+      '<button class="sexp" title="Totales según stock" onclick="toggleProd(\''+p.id+'\')">'+(open?'▲':'▼')+'</button>'+
+      '</div>';
+    if(open){
+      var ct=cant*(p.may||0), vt=cant*(p.sug||0), gn=vt-ct;
+      out+='<div class="sdetail">'+
+        '<span class="u">'+cant+' unid. × '+money(p.may||0)+' costo · '+money(p.sug||0)+' venta</span>'+
+        '<div>Costo total<b>'+money(ct)+'</b></div>'+
+        '<div>Venta total<b>'+money(vt)+'</b></div>'+
+        '<div>Ganancia<b class="gan">'+money(gn)+'</b></div>'+
+        '</div>';
+    }
+  });
+  el.innerHTML=out;
+}
+var OPEN_PROD=null; // producto desplegado en Stock
+function toggleProd(id){ OPEN_PROD=(OPEN_PROD===id)?null:id; renderStock(); }
+function saveProd(id,field,value){
+  var arr=getProd().map(function(p){
+    if(p.id===id){ p[field]=(field==="nombre")?String(value).trim():(parseInt(value||"0",10)||0); }
+    return p;
+  });
+  write(K.prod,arr);
+  fillSelects(); // refresca las sugerencias del formulario de ventas
+  if(field==="cant") renderStock(); // refresca contador de la categoría y estado "agotado"
+}
+
+/* ============================================================
+   HORARIOS
+   ============================================================ */
+var DOW=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+var ORD=[1,2,3,4,5,6,0]; // mostrar Lun..Dom
+function renderHorarios(){
+  var c=getCfg();
+  var box=document.getElementById("diasBox");
+  box.innerHTML=ORD.map(function(i){
+    var d=getDia(i);
+    return '<div class="hday'+(d.on?'':' off')+(d.doble?'':' single')+'" id="hday'+i+'">'+
+      '<span class="day" role="button" aria-pressed="'+d.on+'" onclick="toggleDia('+i+')">'+DOW[i]+'</span>'+
+      '<button class="modebtn" type="button" aria-pressed="'+(d.doble?"true":"false")+'" onclick="toggleModo('+i+')">'+(d.doble?"2 turnos":"Corrido")+'</button>'+
+      '<span class="fr"><span class="frlbl">1ª</span>'+
+        '<input type="time" id="d'+i+'f1a" value="'+(d.f1[0]||"")+'"><span class="sep">a</span>'+
+        '<input type="time" id="d'+i+'f1b" value="'+(d.f1[1]||"")+'"></span>'+
+      '<span class="fr fr2"><span class="frlbl">2ª</span>'+
+        '<input type="time" id="d'+i+'f2a" value="'+(d.f2[0]||"")+'"><span class="sep">a</span>'+
+        '<input type="time" id="d'+i+'f2b" value="'+(d.f2[1]||"")+'"></span>'+
+      '</div>';
+  }).join("");
+  renderFrancos();
+  document.getElementById("h_slot").value=minToHH(c.slotMin||45); // duración como 00:45
+  document.getElementById("h_gap").value=minToHH(c.gapMin!=null?c.gapMin:15); // espacio como 00:15
+  document.getElementById("h_horizon").value=c.horizonDays||14;
+  document.getElementById("h_precio").value=c.precioCorte||14000;
+}
+function toggleDia(i){
+  var row=document.getElementById("hday"+i), chip=row.querySelector(".day");
+  var on=chip.getAttribute("aria-pressed")==="true";
+  chip.setAttribute("aria-pressed", (!on).toString());
+  row.classList.toggle("off", on);
+}
+function toggleModo(i){ // Corrido (una franja) ↔ 2 turnos (doble franja)
+  var row=document.getElementById("hday"+i), btn=row.querySelector(".modebtn");
+  var doble=btn.getAttribute("aria-pressed")==="true";
+  var nuevo=!doble;
+  btn.setAttribute("aria-pressed", nuevo.toString());
+  btn.textContent = nuevo?"2 turnos":"Corrido";
+  row.classList.toggle("single", !nuevo);
+  if(nuevo){ // pasar a 2 turnos: si la 2ª franja está vacía, proponer un default
+    if(!val("d"+i+"f2a")) document.getElementById("d"+i+"f2a").value="16:00";
+    if(!val("d"+i+"f2b")) document.getElementById("d"+i+"f2b").value="20:00";
+  }
+}
+function saveHorarios(){
+  var dias={}, days=[];
+  ORD.forEach(function(i){
+    var chip=document.querySelector("#hday"+i+" .day");
+    var mbtn=document.querySelector("#hday"+i+" .modebtn");
+    var on=chip.getAttribute("aria-pressed")==="true";
+    var doble=mbtn.getAttribute("aria-pressed")==="true";
+    dias[i]={on:on, doble:doble,
+      f1:[val("d"+i+"f1a"),val("d"+i+"f1b")],
+      f2:doble?[val("d"+i+"f2a"),val("d"+i+"f2b")]:["",""]}; // corrido: 2ª franja se descarta
+    if(on) days.push(i);
+  });
+  var c=getCfg();
+  var pc=parseInt(val("h_precio")||"0",10)||c.precioCorte||14000; // preservar el precio del corte
+  write(K.cfg,{ days:days, dias:dias, francos:(c.francos||[]), start:c.start||"10:00", end:c.end||"20:00",
+    slotMin:(toMin(val("h_slot"))||45), gapMin:toMin(val("h_gap")), horizonDays:parseInt(val("h_horizon")||"14",10), precioCorte:pc });
+  write(K.serv, getServ().map(function(s){ if((s.nombre||"").toLowerCase()==="corte") s.precio=pc; return s; }));
+  fillSelects(); renderTurnos();
+  alert("Horarios guardados. (El bot de turnos leerá esta config.)");
+}
+
+/* ---------- Francos (día puntual o rango de fechas que no corta) ---------- */
+// suma n días a una fecha ISO (YYYY-MM-DD) trabajando en horario LOCAL, sin líos de zona
+function isoAdd(isoStr,n){ var d=new Date(isoStr+"T12:00:00"); d.setDate(d.getDate()+n);
+  var m=d.getMonth()+1, day=d.getDate();
+  return d.getFullYear()+"-"+(m<10?"0":"")+m+"-"+(day<10?"0":"")+day; }
+function fmtFrancoDia(isoStr){ var d=new Date(isoStr+"T12:00:00");
+  var t=d.toLocaleDateString("es-AR",{weekday:"short",day:"2-digit",month:"2-digit"});
+  return t.charAt(0).toUpperCase()+t.slice(1); }
+// expande [desde..hasta] inclusive a días individuales (cap de seguridad)
+function rangoDias(desde,hasta){ var out=[], cur=desde, g=0; while(cur<=hasta && g++<400){ out.push(cur); cur=isoAdd(cur,1); } return out; }
+
+function renderFrancos(){
+  var el=document.getElementById("francosList"); if(!el) return;
+  var f=(getCfg().francos||[]).slice().sort();
+  if(!f.length){ el.innerHTML='<div class="muted" style="font-size:13px">No hay francos marcados.</div>'; return; }
+  // agrupar días consecutivos en un solo chip de rango
+  var runs=[], start=f[0], prev=f[0];
+  for(var i=1;i<f.length;i++){
+    if(f[i]===isoAdd(prev,1)){ prev=f[i]; }
+    else { runs.push([start,prev]); start=f[i]; prev=f[i]; }
+  }
+  runs.push([start,prev]);
+  el.innerHTML='<div class="francos">'+runs.map(function(r){
+    var txt = r[0]===r[1] ? fmtFrancoDia(r[0]) : (fmtFrancoDia(r[0])+' → '+fmtFrancoDia(r[1]));
+    return '<span class="fchip">'+txt+'<button class="fx" onclick="removeFranco(\''+r[0]+'\',\''+r[1]+'\')" title="Quitar">✕</button></span>';
+  }).join("")+'</div>';
+}
+function addFranco(){
+  var desde=val("francoDesde"), hasta=val("francoHasta")||desde;
+  if(!desde){ alert("Elegí al menos la fecha 'Desde'."); return; }
+  if(hasta<desde){ var t=desde; desde=hasta; hasta=t; } // por si los cargan al revés
+  var c=getCfg(); c.francos=c.francos||[];
+  var nuevos=rangoDias(desde,hasta).filter(function(d){ return c.francos.indexOf(d)<0; });
+  if(!nuevos.length){ alert("Ese período ya estaba marcado como franco."); return; }
+  // turnos activos dentro del rango → cancelar y avisar
+  var afectados=getTurnos().filter(function(t){
+    return t.estado!=="cancelado" && nuevos.indexOf(iso(new Date(t.fecha)))>-1;
+  });
+  if(afectados.length){
+    var lista=afectados.slice(0,10).map(function(t){ return "• "+fmtDia(t.fecha)+" "+fmtHora(t.fecha)+" "+t.nombre; }).join("\n")+
+      (afectados.length>10?"\n…y "+(afectados.length-10)+" más":"");
+    if(!confirm("En ese período tenés "+afectados.length+(afectados.length===1?" turno":" turnos")+":\n\n"+lista+
+      "\n\nSe van a CANCELAR y vas a poder avisarle a cada cliente. ¿Seguir?")) return;
+    write(K.turnos, getTurnos().map(function(t){
+      if(t.estado!=="cancelado" && nuevos.indexOf(iso(new Date(t.fecha)))>-1){ t.estado="cancelado"; t.cancelPorFranco=true; }
+      return t;
+    }));
+  }
+  nuevos.forEach(function(d){ c.francos.push(d); }); write(K.cfg,c);
+  document.getElementById("francoDesde").value=""; document.getElementById("francoHasta").value="";
+  renderFrancos(); renderTurnos();
+  if(afectados.length) avisarCancelados(afectados);
+}
+function removeFranco(desde,hasta){
+  var quitar={}; rangoDias(desde,hasta||desde).forEach(function(d){ quitar[d]=1; });
+  var c=getCfg(); c.francos=(c.francos||[]).filter(function(x){ return !quitar[x]; });
+  write(K.cfg,c); renderFrancos(); renderTurnos();
+}
+// aviso a los clientes de los turnos cancelados por franco (demo: links wa.me con mensaje listo).
+// Cada mensaje usa la fecha propia del turno (sirve para rangos de varios días).
+function avisarCancelados(turnos){
+  ["francoAviso","francoLinks"].forEach(function(id){ var o=document.getElementById(id); if(o) o.remove(); });
+  var conTel=turnos.filter(function(t){return t.tel;});
+  var out=document.getElementById("francosList");
+  if(!conTel.length){
+    out.insertAdjacentHTML("afterend",'<div class="banner" id="francoAviso"><span>⚠️</span><span>Se cancelaron '+
+      turnos.length+' turno(s), pero ninguno tenía WhatsApp cargado para avisar.</span></div>');
+    return;
+  }
+  var links=conTel.map(function(t){
+    var dtxt=new Date(t.fecha).toLocaleDateString("es-AR",{weekday:"long",day:"2-digit",month:"2-digit"});
+    var msg="Hola "+(t.nombre||"").split(" ")[0]+"! Soy de Unibaso Barber. Te tengo que avisar que este "+
+      dtxt+" no voy a estar atendiendo, así que se cancela tu turno de las "+fmtHora(t.fecha)+
+      ". Escribime y lo reprogramamos cuando quieras. ¡Perdón por el inconveniente!";
+    return '<a class="wa" target="_blank" href="https://wa.me/'+t.tel+'?text='+encodeURIComponent(msg)+'">'+
+      (t.nombre||("+"+t.tel))+' →</a>';
+  }).join(" ");
+  out.insertAdjacentHTML("afterend",'<div class="banner" id="francoAviso"><span>💬</span><span>'+
+    'Se cancelaron <b>'+turnos.length+'</b> turno(s). Avisales a los clientes (se abre el chat con el mensaje ya escrito):'+
+    '</span></div><div class="row" id="francoLinks" style="margin:-8px 2px 8px;gap:8px">'+links+'</div>');
+}
+
+/* ============================================================
+   MENSAJES / PROMOS
+   ============================================================ */
+function buildContacts(){
+  var byTel={};
+  getTurnos().forEach(function(t){
+    if(!t.tel) return;
+    var c=byTel[t.tel]||{nombre:t.nombre,tel:t.tel,lastTurno:null,lastCorte:null};
+    if(!c.lastTurno||t.fecha>c.lastTurno) c.lastTurno=t.fecha;
+    if(t.estado==="realizado" && (!c.lastCorte||t.fecha>c.lastCorte)) c.lastCorte=t.fecha;
+    c.nombre=t.nombre; byTel[t.tel]=c;
+  });
+  // clientes de Ventas también cuentan como contactos (aparecen en "Todos los contactos")
+  getVentas().forEach(function(v){
+    if(!v.tel) return;
+    var c=byTel[v.tel]||{nombre:v.cliente,tel:v.tel,lastTurno:null,lastCorte:null};
+    if(v.cliente && v.cliente!=="—") c.nombre=c.nombre||v.cliente;
+    byTel[v.tel]=c;
+  });
+  return Object.keys(byTel).map(function(k){return byTel[k];});
+}
+var MANUAL=[];                      // contactos agregados a mano (nombre + tel libre)
+var LASTF={list:[],tipo:"corte"};   // último resultado del filtro
+function runFilter(){
+  // rango: último corte hace ENTRE "desde" y "hasta" días
+  var desde=parseInt(val("m_desde")||"0",10), hasta=parseInt(val("m_hasta")||"0",10), now=new Date();
+  if(hasta<desde){ var t=desde; desde=hasta; hasta=t; } // por si los cargan al revés
+  var res=buildContacts().filter(function(c){
+    if(!c.lastCorte) return false;
+    var d=daysBetween(new Date(c.lastCorte),now);
+    return d>=desde && d<=hasta;
+  });
+  LASTF={list:res,tipo:"corte"};
+  renderContacts();
+}
+function filtroTodos(){
+  LASTF={list:buildContacts(),tipo:"todos"};
+  renderContacts();
+}
+/* selector emergente: agrega contactos desde la cartera de Clientes */
+function openPicker(){
+  document.getElementById("pickerModal").classList.remove("hidden");
+  document.getElementById("pickerSearch").value="";
+  renderPicker();
+  document.getElementById("pickerSearch").focus();
+}
+function closePicker(){ document.getElementById("pickerModal").classList.add("hidden"); }
+function enLista(tel){ // ¿ya está en la lista de contactos armada (filtro o manual)?
+  return LASTF.list.concat(MANUAL).some(function(c){ return String(c.tel)===String(tel); });
+}
+function renderPicker(){
+  var toks=normTxt(val("pickerSearch")).split(/\s+/).filter(Boolean);
+  var list=getClientes().filter(function(c){
+    if(!toks.length) return true;
+    var n=normTxt(c.nombre), t=String(c.tel);
+    return toks.every(function(k){ return n.indexOf(k)>-1 || t.indexOf(k)>-1; });
+  }).sort(function(a,b){ return a.creado<b.creado?1:-1; });
+  var el=document.getElementById("pickerList");
+  if(!list.length){ el.innerHTML='<div class="empty" style="padding:18px 0">No hay clientes que coincidan.</div>'; return; }
+  el.innerHTML=list.map(function(c){
+    var ya=enLista(c.tel);
+    return '<div class="prow"><div class="pn">'+escHtml(c.nombre)+
+      '<small class="tnum">+'+c.tel+'</small></div>'+
+      '<button '+(ya?'disabled':'onclick="pickCliente(\''+c.id+'\')"')+'>'+(ya?"Ya está":"Agregar")+'</button></div>';
+  }).join("");
+}
+function pickCliente(id){
+  var c=getClientes().find(function(x){return x.id===id;});
+  if(!c || enLista(c.tel)) return;
+  MANUAL.push({nombre:c.nombre,tel:c.tel,manual:true});
+  renderContacts(); renderPicker(); // el modal queda abierto para seguir agregando
+}
+function removeManual(tel){
+  MANUAL=MANUAL.filter(function(c){return c.tel!==tel;}); renderContacts();
+}
+function renderContacts(){
+  var el=document.getElementById("contactsList");
+  var all=LASTF.list.concat(MANUAL);
+  document.getElementById("m_count").textContent="("+all.length+")";
+  if(!all.length){ el.innerHTML='<div class="empty">Corré un filtro o agregá un contacto a mano.</div>'; return; }
+  var now=new Date();
+  el.innerHTML=all.map(function(c){
+    var tag;
+    if(c.manual){ tag='<small>manual · <button class="mini-x" onclick="removeManual(\''+c.tel+'\')" title="Quitar">✕</button></small>'; }
+    else { tag='<small>'+(c.lastCorte?daysBetween(new Date(c.lastCorte),now)+" días sin corte":"sin cortes")+'</small>'; }
+    return '<label class="contact"><input type="checkbox" class="cbx" data-nombre="'+c.nombre+'" data-tel="'+c.tel+'" checked>'+
+      '<span>'+c.nombre+'<br><small class="tnum">+'+c.tel+'</small></span>'+
+      tag+'</label>';
+  }).join("");
+}
+function prepareSend(){
+  var msg=val("m_msg");
+  if(!msg){ alert("Escribí el mensaje."); return; }
+  var picked=[];
+  document.querySelectorAll("#contactsList .cbx").forEach(function(b){
+    if(b.checked) picked.push({nombre:b.getAttribute("data-nombre"),tel:b.getAttribute("data-tel")});
+  });
+  if(!picked.length){ alert("Seleccioná al menos un contacto."); return; }
+  var out=document.getElementById("sendResult");
+
+  if(window.UNIBASO_PROMO_WEBHOOK){
+    fetch(window.UNIBASO_PROMO_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({contactos:picked,mensaje:msg})})
+      .then(function(){ out.innerHTML='<div class="banner"><span>✅</span><span>Enviado a <b>'+picked.length+'</b> contactos vía n8n.</span></div>'; })
+      .catch(function(){ out.innerHTML='<div class="banner"><span>⚠️</span><span>No se pudo contactar el webhook.</span></div>'; });
+    return;
+  }
+  // Modo demo: links wa.me listos para mandar a mano
+  var links=picked.map(function(p){
+    var txt=encodeURIComponent(msg.replace(/{nombre}/g,(p.nombre||"").split(" ")[0]));
+    return '<a class="wa" target="_blank" href="https://wa.me/'+p.tel+'?text='+txt+'">'+p.nombre+' →</a>';
+  }).join(" ");
+  out.innerHTML='<div class="banner"><span>💬</span><span><b>'+picked.length+'</b> contactos listos. '+
+    'En modo demo no hay envío masivo automático — abrí cada chat con el mensaje ya cargado, o conectá el '+
+    'webhook de n8n para envío en lote.</span></div><div class="row" style="margin-top:10px">'+links+'</div>';
+}
+
+/* ============================================================
+   helpers UI + boot
+   ============================================================ */
+function val(id){ var e=document.getElementById(id); return e?(e.value||"").trim():""; }
+function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+function fillSelects(){
+  document.getElementById("t_serv").innerHTML=getServ().map(function(s){
+    return '<option value="'+s.id+'">'+s.nombre+' · '+money(s.precio)+'</option>'; }).join("");
+  document.getElementById("prodList").innerHTML=getProd().map(function(p){
+    return '<option value="'+p.nombre+'">'; }).join("");
+  var today=iso(new Date());
+  ["t_fecha","vp_alta"].forEach(function(i){ var e=document.getElementById(i); if(e&&!e.value) e.value=today; });
+}
+function boot(){
+  if(!CLOUD.on) seed();   // en modo nube no sembramos demo: los datos son reales
+  fillSelects();
+  renderTurnos(); renderVentas(); renderVIP(); renderClientes(); renderHorarios(); renderBalance();
+}
+/* cerrar el menú de 3 puntitos al hacer click en cualquier otro lado */
+document.addEventListener("click",function(){ closeTurnoMenus(); });
+/* ---------- Arranque: gate según modo ----------
+   NUBE  → pide mail + contraseña; la sesión la recuerda Firebase Auth.
+   DEMO  → clave fija guardada en localStorage (igual que siempre). */
+if(CLOUD_CFG){
+  document.getElementById("email").classList.remove("hidden");
+  document.getElementById("hintDemo").classList.add("hidden");
+  document.getElementById("hintCloud").classList.remove("hidden");
+  var _btn=document.getElementById("btnEntrar");
+  _btn.disabled=true; _btn.textContent="Verificando…";
+  authInit().then(function(u){
+    _btn.disabled=false; _btn.textContent="Entrar";
+    if(u) entrar();                       // ya había sesión abierta
+  }).catch(function(e){
+    _btn.disabled=false; _btn.textContent="Entrar";
+    console.warn("authInit falló:", e);
+  });
+} else if(LS.getItem("uni_auth")==="1"){
+  entrar();
+}
+</script>
