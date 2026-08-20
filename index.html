@@ -885,7 +885,7 @@ function seed(){
   var demoOld=parseInt(LS.getItem("uni_demover")||"0",10)<DEMO_VER;
   // Un solo servicio: "Corte". El corte es plano, con diseño/barba o no.
   if(!read(K.serv,null) || demoOld) write(K.serv,[
-    {id:"s1",nombre:"Corte",precio:14000,dur:30,activo:true}
+    {id:"s1",nombre:"Corte",precio:15000,dur:30,activo:true}
   ]);
   /* ---- Catálogo VIGGO (lista mayorista 30/6/2026) — [nombre, mayorista, sugerido] ----
      Se excluyen los ítems que figuran con precio ARS 0,00 en la lista. */
@@ -1042,12 +1042,12 @@ function seed(){
   };
   // corte 45 + espacio 15 = 60 → los turnos arrancan SIEMPRE en hora en punto (10, 11, 12...)
   if(!read(K.cfg,null)) write(K.cfg,{
-    days:[2,3,4,5,6], dias:defDias(), start:"10:00", end:"20:00", slotMin:45, gapMin:15, horizonDays:14, precioCorte:14000
+    days:[2,3,4,5,6], dias:defDias(), start:"10:00", end:"20:00", slotMin:45, gapMin:15, horizonDays:14, precioCorte:15000
   });
   // completar/forzar precioCorte + duración + gap + dias (demo)
   var _c=read(K.cfg,{});
   if(_c){ var _ch=false;
-    if(_c.precioCorte==null || demoOld){ _c.precioCorte=14000; _ch=true; }
+    if(_c.precioCorte==null || demoOld){ _c.precioCorte=15000; _ch=true; }
     if(_c.slotMin==null || demoOld){ _c.slotMin=45; _ch=true; }
     if(_c.gapMin==null || demoOld){ _c.gapMin=15; _ch=true; }
     if(demoOld){ _c.dias=defDias(); _c.days=[2,3,4,5,6]; _ch=true; }
@@ -1068,29 +1068,29 @@ function seed(){
     d.setDate(d.getDate()+((dow-d.getDay()+7)%7)); return d.toISOString(); };
   if(!read(K.turnos,null) || demoOld){ var _tur=[
     // Martes: 4 turnos (uno realizado, para ver el botón Borrar) — SIEMPRE en hora en punto
-    {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",servId:"s1",fecha:nextDow(2,10,0),estado:"realizado",precio:14000},
-    {id:uid(),nombre:"Lucas Ferreyra",tel:"5492284611002",servId:"s1",fecha:nextDow(2,11,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Ezequiel Paz",tel:"5492284611003",servId:"s1",fecha:nextDow(2,12,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Franco Díaz",tel:"5492284611009",servId:"s1",fecha:nextDow(2,13,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",servId:"s1",fecha:nextDow(2,10,0),estado:"realizado",precio:15000},
+    {id:uid(),nombre:"Lucas Ferreyra",tel:"5492284611002",servId:"s1",fecha:nextDow(2,11,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Ezequiel Paz",tel:"5492284611003",servId:"s1",fecha:nextDow(2,12,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Franco Díaz",tel:"5492284611009",servId:"s1",fecha:nextDow(2,13,0),estado:"confirmado",precio:15000},
     // Miércoles: un solo turno
-    {id:uid(),nombre:"Tomás Vidal",tel:"5492284611007",servId:"s1",fecha:nextDow(3,16,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Tomás Vidal",tel:"5492284611007",servId:"s1",fecha:nextDow(3,16,0),estado:"confirmado",precio:15000},
     // Jueves: 3 turnos
-    {id:uid(),nombre:"Iván Molina",tel:"5492284611008",servId:"s1",fecha:nextDow(4,10,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Julián Costa",tel:"5492284611004",servId:"s1",fecha:nextDow(4,11,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Bruno Vera",tel:"5492284611005",servId:"s1",fecha:nextDow(4,12,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Iván Molina",tel:"5492284611008",servId:"s1",fecha:nextDow(4,10,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Julián Costa",tel:"5492284611004",servId:"s1",fecha:nextDow(4,11,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Bruno Vera",tel:"5492284611005",servId:"s1",fecha:nextDow(4,12,0),estado:"confirmado",precio:15000},
     // Viernes: 5 turnos
-    {id:uid(),nombre:"Nahuel Sosa",tel:"5492284611006",servId:"s1",fecha:nextDow(5,10,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Agustín Rey",tel:"5492284611010",servId:"s1",fecha:nextDow(5,11,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Marcos Peña",tel:"5492284611011",servId:"s1",fecha:nextDow(5,12,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Santi López",tel:"5492284611012",servId:"s1",fecha:nextDow(5,13,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Facu Torres",tel:"5492284611013",servId:"s1",fecha:nextDow(5,15,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Nahuel Sosa",tel:"5492284611006",servId:"s1",fecha:nextDow(5,10,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Agustín Rey",tel:"5492284611010",servId:"s1",fecha:nextDow(5,11,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Marcos Peña",tel:"5492284611011",servId:"s1",fecha:nextDow(5,12,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Santi López",tel:"5492284611012",servId:"s1",fecha:nextDow(5,13,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Facu Torres",tel:"5492284611013",servId:"s1",fecha:nextDow(5,15,0),estado:"confirmado",precio:15000},
     // Sábado: 3 turnos
-    {id:uid(),nombre:"Pedro Aguirre",tel:"5492284611014",servId:"s1",fecha:nextDow(6,10,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Leo Núñez",tel:"5492284611015",servId:"s1",fecha:nextDow(6,11,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Dylan Soto",tel:"5492284611016",servId:"s1",fecha:nextDow(6,12,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Pedro Aguirre",tel:"5492284611014",servId:"s1",fecha:nextDow(6,10,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Leo Núñez",tel:"5492284611015",servId:"s1",fecha:nextDow(6,11,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Dylan Soto",tel:"5492284611016",servId:"s1",fecha:nextDow(6,12,0),estado:"confirmado",precio:15000},
     // turnos a más de 7 días (aparecen en "Más adelante", debajo del acordeón semanal)
-    {id:uid(),nombre:"Lautaro Vega",tel:"5492284611017",servId:"s1",fecha:atDay(10,11,0),estado:"confirmado",precio:14000},
-    {id:uid(),nombre:"Ramiro Duarte",tel:"5492284611018",servId:"s1",fecha:atDay(16,16,0),estado:"confirmado",precio:14000},
+    {id:uid(),nombre:"Lautaro Vega",tel:"5492284611017",servId:"s1",fecha:atDay(10,11,0),estado:"confirmado",precio:15000},
+    {id:uid(),nombre:"Ramiro Duarte",tel:"5492284611018",servId:"s1",fecha:atDay(16,16,0),estado:"confirmado",precio:15000},
     // realizados anteriores (historial para filtros de Mensajes y balance)
     {id:uid(),nombre:"Martín Ríos",tel:"5492284611001",servId:"s1",fecha:atDay(-12,17,0),estado:"realizado",precio:8000},
     {id:uid(),nombre:"Julián Costa",tel:"5492284611004",servId:"s2",fecha:atDay(-8,18,0),estado:"realizado",precio:10000},
@@ -1103,10 +1103,10 @@ function seed(){
   var histTels=["5492284611001","5492284611002","5492284611005","5492284611006","5492284611004"];
   [64,72,93,100,124,130,158,165,190,196,205,215,225,240,255].forEach(function(off,k){
     _tur.push({id:uid(),nombre:histNombres[k%5],tel:histTels[k%5],servId:"s1",
-      fecha:atDay(-off,15,0),estado:"realizado",precio:14000});
+      fecha:atDay(-off,15,0),estado:"realizado",precio:15000});
   });
   // servicio único "Corte" a precio plano
-  _tur.forEach(function(t){ t.servId="s1"; t.precio=14000; });
+  _tur.forEach(function(t){ t.servId="s1"; t.precio=15000; });
   write(K.turnos,_tur); }
   if(!read(K.ventas,null) || demoOld) write(K.ventas,[
     {id:uid(),fecha:justNow(),cliente:"Juan Pérez",tel:"5492284622001",producto:"Cera modeladora",total:6000,costo:3200,pago:"Efectivo",tipo:"contado"},
@@ -1694,7 +1694,7 @@ function renderClientes(){
 var VIP_DESC={vip3:0.20, vip4:0.23};   // descuento del pack
 var VIP_CORTES={vip3:3, vip4:4};       // cortes que incluye
 function vipLabel(tipo){ return tipo==="vip4"?"VIP 4":"VIP 3"; }
-function precioCorte(){ var c=getCfg(); return c.precioCorte||14000; }
+function precioCorte(){ var c=getCfg(); return c.precioCorte||15000; }
 function vipPackPrice(tipo){ return Math.round(precioCorte()*VIP_CORTES[tipo]*(1-VIP_DESC[tipo])); }
 // mismo día del mes siguiente (si el mes no tiene ese día, cae al último — ej. 31 → 30)
 function addMonthIso(isoStr){ var d=new Date(isoStr); var day=d.getDate(); d.setMonth(d.getMonth()+1);
@@ -1929,7 +1929,7 @@ function renderHorarios(){
   document.getElementById("h_slot").value=minToHH(c.slotMin||45); // duración como 00:45
   document.getElementById("h_gap").value=minToHH(c.gapMin!=null?c.gapMin:15); // espacio como 00:15
   document.getElementById("h_horizon").value=c.horizonDays||14;
-  document.getElementById("h_precio").value=c.precioCorte||14000;
+  document.getElementById("h_precio").value=c.precioCorte||15000;
 }
 function toggleDia(i){
   var row=document.getElementById("hday"+i), chip=row.querySelector(".day");
@@ -1962,7 +1962,7 @@ function saveHorarios(){
     if(on) days.push(i);
   });
   var c=getCfg();
-  var pc=parseInt(val("h_precio")||"0",10)||c.precioCorte||14000; // preservar el precio del corte
+  var pc=parseInt(val("h_precio")||"0",10)||c.precioCorte||15000; // preservar el precio del corte
   write(K.cfg,{ days:days, dias:dias, francos:(c.francos||[]), start:c.start||"10:00", end:c.end||"20:00",
     slotMin:(toMin(val("h_slot"))||45), gapMin:toMin(val("h_gap")), horizonDays:parseInt(val("h_horizon")||"14",10), precioCorte:pc });
   write(K.serv, getServ().map(function(s){ if((s.nombre||"").toLowerCase()==="corte") s.precio=pc; return s; }));
