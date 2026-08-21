@@ -266,6 +266,14 @@
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:none}
   .vipacts button:hover,.vipacts a:hover{border-color:var(--fg);color:var(--fg)}
   .vipacts .danger:hover{border-color:var(--stop);color:var(--stop)}
+  .vipacts .ok{border-color:var(--ok);color:var(--ok)}
+  .vipacts .ok:hover{background:var(--ok);color:var(--bg);border-color:var(--ok)}
+  /* pack comprado por el bot, pago sin verificar */
+  .vipwarn{margin-top:10px;padding:8px 10px;border:1px solid var(--wait);border-left-width:3px;
+    color:var(--wait);font-size:12px;line-height:1.45}
+  .vipwarn b{color:var(--wait)}
+  /* deuda arrastrada de una cancelación tardía */
+  .debe{color:var(--stop);font-weight:700}
   .viptag--mini{font-size:9px;letter-spacing:.12em;color:var(--wait);border:1px solid currentColor;
     padding:2px 6px;border-radius:999px;margin-left:7px;vertical-align:middle;font-family:var(--sans);font-weight:600}
 
@@ -1290,7 +1298,12 @@ function turnoRow(t,cls){
   var tel=t.tel?' · +'+t.tel:"";
   var vipTag=yaVip?'<span class="viptag--mini">VIP</span>':"";
   var bono=t.vipConsumed?" · corte con bono VIP":"";
-  return '<span class="who">'+t.nombre+vipTag+'<small>'+servName(t.servId)+tel+bono+'</small></span>'+
+  // Deuda arrastrada de una cancelación tardía: se cobra junto con este turno.
+  var deuda=t.deudaArrastrada
+    ? ' · <b class="debe">a cobrar '+money((t.vipConsumed?0:(t.precio||0))+t.deudaArrastrada)+
+      '</b> (incluye '+money(t.deudaArrastrada)+' que debía)'
+    : "";
+  return '<span class="who">'+t.nombre+vipTag+'<small>'+servName(t.servId)+tel+bono+deuda+'</small></span>'+
     '<span class="tacts"><span class="pill pill--'+cls+'">'+t.estado+'</span>'+acts+'</span>';
 }
 
@@ -1386,24 +1399,34 @@ function renderTurnos(){
   el.innerHTML=out;
 }
 function setEstado(id,estado){
+  var saldar=null;
   var arr=getTurnos().map(function(t){
     if(t.id===id){
-      // al marcar realizado: si el cliente es VIP con bonos, se descuenta uno (corte cubierto)
-      if(estado==="realizado" && t.estado!=="realizado" && !t.vipConsumed){
-        var vp=consumeVipBono(t.tel);
-        if(vp){ t.vipConsumed=true; t.vipPrice=vp; }
+      if(estado==="realizado" && t.estado!=="realizado"){
+        // si el cliente es VIP con bonos, se descuenta uno (corte cubierto)
+        if(!t.vipConsumed){
+          var vp=consumeVipBono(t.tel);
+          if(vp){ t.vipConsumed=true; t.vipPrice=vp; }
+        }
+        // cobró también la cancelación que debía: se saldan esos turnos
+        if(t.deudaTurnos && !t.deudaCobrada){ saldar=t.deudaTurnos; t.deudaCobrada=true; }
       }
       t.estado=estado;
     }
     return t;
   });
+  if(saldar) arr.forEach(function(x){ if(saldar.indexOf(x.id)>-1) x.deudaSaldada=true; });
   write(K.turnos,arr); renderTurnos(); renderBalance();
 }
 function delTurno(id){
   if(confirm("¿Borrar este turno? (Si estaba realizado, deja de contar en el Balance.)")){
     var t=getTurnos().find(function(x){return x.id===id;});
     if(t && t.vipConsumed) refundVipBono(t.tel); // devolver el bono usado
-    write(K.turnos,getTurnos().filter(function(x){return x.id!==id;}));
+    var arr=getTurnos().filter(function(x){return x.id!==id;});
+    // si este turno había saldado una deuda, la deuda vuelve a quedar pendiente
+    if(t && t.deudaCobrada && t.deudaTurnos)
+      arr.forEach(function(x){ if(t.deudaTurnos.indexOf(x.id)>-1) x.deudaSaldada=false; });
+    write(K.turnos,arr);
     renderTurnos(); renderBalance();
   }
 }
@@ -1552,9 +1575,12 @@ function statsPeriodo(start,end){
   var inP=function(f){ if(!f) return false; var d=new Date(f); return d>=start && d<end; };
   // Cortes realizados (los cubiertos por bono VIP suman $0: esa plata entró con la membresía)
   var cortesArr=getTurnos().filter(function(t){ return t.estado==="realizado" && inP(t.fecha); });
-  var cortes=cortesArr.reduce(function(s,t){return s+(t.vipConsumed?0:(t.precio||0));},0);
-  // Membresías VIP pagadas (por fecha de alta/renovación)
-  var vipIng=getVIP().filter(function(v){ return inP(v.alta); })
+  // + la deuda de una cancelación tardía, si se cobró junto con este turno
+  var cortes=cortesArr.reduce(function(s,t){
+    return s+(t.vipConsumed?0:(t.precio||0))+(t.deudaCobrada?(t.deudaArrastrada||0):0); },0);
+  // Membresías VIP pagadas (por fecha de alta/renovación).
+  // Las que compró el cliente por el bot y Thiago todavía no verificó NO cuentan.
+  var vipIng=getVIP().filter(function(v){ return inP(v.alta) && v.verificado!==false; })
     .reduce(function(s,v){ return s+(v.precio!=null?v.precio:vipPackPrice(v.tipo)); },0);
   // Ventas COBRADAS: contado por fecha de venta; financiadas cuota a cuota (costo prorrateado)
   var vBruto=0, vCosto=0, ventasN=0;
@@ -1825,13 +1851,26 @@ function vipCardHtml(v){
     '<div class="vipdates">Alta '+fmtShort(v.alta)+'<span class="sep">·</span>Vence '+fmtShort(v.vence)+
       '<span class="pill pill--'+est.cls+'">'+est.label+'</span>'+
       '<span class="muted">'+estTxt+'</span></div>'+
+    (v.verificado===false
+      ? '<div class="vipwarn">⚠️ Lo compró el cliente por WhatsApp. <b>Verificá que el pago '+
+        'entró</b> y confirmalo — hasta entonces no suma al Balance.</div>'
+      : '')+
     '<div class="vipfoot"><span class="pack">Pack <b>'+money(vipPackPrice(v.tipo))+'</b> · '+v.pago+'</span>'+
       '<span class="vipacts">'+wa+
+        (v.verificado===false
+          ? '<button class="ok" onclick="confirmarVIP(\''+v.id+'\')">✓ Confirmar pago</button>'
+          : '')+
         '<button onclick="usarBono(\''+v.id+'\')">− Usar corte</button>'+
         '<button onclick="devolverBono(\''+v.id+'\')">+ Devolver</button>'+
         '<button onclick="renovarVIP(\''+v.id+'\')">Renovar</button>'+
         '<button class="danger" onclick="delVIP(\''+v.id+'\')">Borrar</button>'+
       '</span></div></div>';
+}
+// Thiago confirma que el pago del pack que compró el cliente por el bot entró.
+// Recién ahí el VIP suma al Balance.
+function confirmarVIP(id){
+  write(K.vip,getVIP().map(function(v){ if(v.id===id) v.verificado=true; return v; }));
+  renderVIP(); renderBalance();
 }
 function renderVIP(){
   var pin=document.getElementById("vip_precio");
