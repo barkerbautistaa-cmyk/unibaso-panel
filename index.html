@@ -690,6 +690,22 @@
           turnos</b> en esos días; si ya había turnos, te los muestra para <b>cancelarlos y avisarle a
           cada cliente</b> por WhatsApp.</p>
       </div>
+
+      <div class="card">
+        <div class="card-title">Horarios especiales — un día con otro horario</div>
+        <div class="franco-add">
+          <label class="fld">Desde<input type="date" id="espDesde"></label>
+          <label class="fld">Hasta <span style="text-transform:none;letter-spacing:normal">(opcional)</span><input type="date" id="espHasta"></label>
+          <label class="fld">Abre<input type="time" id="espAbre" value="09:00"></label>
+          <label class="fld">Cierra<input type="time" id="espCierra" value="19:00"></label>
+          <button class="btn btn--sm" onclick="addEspecial()">Guardar</button>
+        </div>
+        <div id="especialesList"></div>
+        <p class="muted" style="font-size:12px;margin:12px 2px 0">Para cuando <b>un día puntual</b>
+          cortás distinto de lo habitual, sin cambiar el horario de todas las semanas. Sirve para
+          <b>abrir un día que normalmente cerrás</b> (ej: un miércoles antes de las vacaciones) o para
+          cambiar el horario de un día. El bot también lo puede cargar si se lo pedís por WhatsApp.</p>
+      </div>
       <div class="card">
         <div class="card-title">Precio del corte</div>
         <div class="row">
@@ -1273,6 +1289,22 @@ function franjasDia(dow){
 }
 // ¿la fecha (YYYY-MM-DD local) está marcada como franco?
 function esFranco(dayIso){ return (getCfg().francos||[]).indexOf(dayIso)>-1; }
+/* Horario especial de una fecha puntual (cfg.especiales[fecha], misma forma que
+   cfg.dias[dow]). Pisa al día de la semana SOLO para esa fecha. Es el espejo de
+   franjasFecha() en bot/bot-logic.js: si el panel no lo supiera, un miércoles abierto
+   por el bot aparecería "Cerrado" acá, y un turno a las 9 de un lunes especial caería
+   fuera de la grilla de 10 a 12 y 13 a 19. */
+function especialDe(dayIso){ var e=getCfg().especiales; return (e && e[dayIso]) || null; }
+function franjasFecha(dayIso, dow){
+  var esp=especialDe(dayIso);
+  if(!esp) return franjasDia(dow);
+  var out=[];
+  if(!esp.on) return out;
+  (esp.doble?[esp.f1,esp.f2]:[esp.f1]).forEach(function(f){
+    if(f && f[0] && f[1] && toMin(f[1])>toMin(f[0])) out.push([toMin(f[0]),toMin(f[1])]);
+  });
+  return out;
+}
 function estadoCls(t){ return (t.estado==="realizado"||t.estado==="confirmado")?"ok":"wait"; }
 
 function turnoRow(t,cls){
@@ -1316,13 +1348,15 @@ function renderTurnos(){
     var day=new Date(today); day.setDate(today.getDate()+d);
     var dayIso=iso(day);
     var franco=esFranco(dayIso);
-    var atiende=!franco && franjasDia(day.getDay()).length>0;
+    var atiende=!franco && franjasFecha(dayIso, day.getDay()).length>0;
+    var esp=!franco && especialDe(dayIso);
     var turnos=all.filter(function(t){ return iso(new Date(t.fecha))===dayIso; })
       .sort(function(a,b){ return a.fecha<b.fecha?-1:1; });
     var label=(d===0?"Hoy · ":d===1?"Mañana · ":"")+fmtDia(day);
     var count=turnos.length
       ? turnos.length+(turnos.length===1?" turno":" turnos")+(!atiende?(franco?" · franco":" · cerrado"):"")
       : (franco?"Franco · no cortás":(!atiende?"Cerrado":"Sin turnos"));
+    if(esp && atiende) count+=" · horario especial "+esp.f1[0]+"–"+(esp.doble?esp.f2[1]:esp.f1[1]);
     var open=OPEN_DAY===dayIso;
     out+='<div class="dayblock'+(open?" open":"")+'">'+
       '<button class="dayhead" onclick="expandDay(\''+dayIso+'\')">'+
@@ -1344,7 +1378,7 @@ function renderTurnos(){
         // horario completo del día = sus franjas (una o dos), slot a slot
         var step=(cfg.slotMin||60)+(cfg.gapMin||0);
         var rows=[], shown={};
-        franjasDia(day.getDay()).forEach(function(fr){
+        franjasFecha(dayIso, day.getDay()).forEach(function(fr){
           for(var m=fr[0]; m<fr[1]; m+=step){
             var slotTurnos=turnos.filter(function(t){
               var dt=new Date(t.fecha), tm=dt.getHours()*60+dt.getMinutes();
@@ -1965,6 +1999,7 @@ function renderHorarios(){
       '</div>';
   }).join("");
   renderFrancos();
+  renderEspeciales();
   document.getElementById("h_slot").value=minToHH(c.slotMin||45); // duración como 00:45
   document.getElementById("h_gap").value=minToHH(c.gapMin!=null?c.gapMin:15); // espacio como 00:15
   document.getElementById("h_horizon").value=c.horizonDays||14;
@@ -2002,8 +2037,16 @@ function saveHorarios(){
   });
   var c=getCfg();
   var pc=parseInt(val("h_precio")||"0",10)||c.precioCorte||15000; // preservar el precio del corte
-  write(K.cfg,{ days:days, dias:dias, francos:(c.francos||[]), start:c.start||"10:00", end:c.end||"20:00",
-    slotMin:(toMin(val("h_slot"))||45), gapMin:toMin(val("h_gap")), horizonDays:parseInt(val("h_horizon")||"14",10), precioCorte:pc });
+  /* Object.assign sobre la config EXISTENTE, no un objeto nuevo. Hasta el 14-09-2026 esto
+     armaba la config con 9 campos fijos, y en la base hay 18: guardar horarios borraba
+     adminTels (el bot dejaba de reconocer a Thiago), direccion, pagos y
+     aliasTransferencia (no podía decirle a un cliente dónde queda ni cómo pagar),
+     cancelHoras, holdMin, los horarios de los recordatorios, botTel y los horarios
+     especiales. Todavía no había pasado, pero el bot mismo le había dicho a Thiago
+     que cambiara los horarios desde acá. Acá solo se pisan los campos de esta pestaña. */
+  write(K.cfg, Object.assign({}, c, { days:days, dias:dias, francos:(c.francos||[]),
+    start:c.start||"10:00", end:c.end||"20:00",
+    slotMin:(toMin(val("h_slot"))||45), gapMin:toMin(val("h_gap")), horizonDays:parseInt(val("h_horizon")||"14",10), precioCorte:pc }));
   write(K.serv, getServ().map(function(s){ if((s.nombre||"").toLowerCase()==="corte") s.precio=pc; return s; }));
   fillSelects(); renderTurnos();
   alert("Horarios guardados. (El bot de turnos leerá esta config.)");
@@ -2066,6 +2109,53 @@ function removeFranco(desde,hasta){
   var quitar={}; rangoDias(desde,hasta||desde).forEach(function(d){ quitar[d]=1; });
   var c=getCfg(); c.francos=(c.francos||[]).filter(function(x){ return !quitar[x]; });
   write(K.cfg,c); renderFrancos(); renderTurnos();
+}
+
+/* ---------- Horarios especiales (un día puntual con otro horario) ----------
+   Espejo de marcarHorarioEspecial() en bot/bot-logic.js: misma forma de dato
+   ({on, doble, f1, f2}), y abrir un día lo saca de francos. No cancela turnos: si
+   alguno queda afuera del horario nuevo, lo avisa para que Thiago decida. */
+function renderEspeciales(){
+  var el=document.getElementById("especialesList"); if(!el) return;
+  var e=getCfg().especiales||{};
+  var hoy=iso(new Date());
+  var dias=Object.keys(e).filter(function(d){ return d>=hoy; }).sort();
+  if(!dias.length){ el.innerHTML='<div class="muted" style="font-size:13px">No hay horarios especiales cargados.</div>'; return; }
+  el.innerHTML='<div class="francos">'+dias.map(function(d){
+    var x=e[d];
+    var hs=x.on ? (x.f1[0]+"–"+x.f1[1]+(x.doble?" y "+x.f2[0]+"–"+x.f2[1]:"")) : "cerrado";
+    return '<span class="fchip">'+fmtFrancoDia(d)+' · '+hs+
+      '<button class="fx" onclick="removeEspecial(\''+d+'\')" title="Volver al horario normal">✕</button></span>';
+  }).join("")+'</div>';
+}
+function addEspecial(){
+  var desde=val("espDesde"), hasta=val("espHasta")||desde, abre=val("espAbre"), cierra=val("espCierra");
+  if(!desde){ alert("Elegí al menos la fecha 'Desde'."); return; }
+  if(!abre || !cierra || toMin(cierra)<=toMin(abre)){ alert("Revisá el horario: tiene que cerrar después de abrir."); return; }
+  if(hasta<desde){ var t=desde; desde=hasta; hasta=t; }
+  var dias=rangoDias(desde,hasta);
+  var c=getCfg();
+  var esp=Object.assign({}, c.especiales||{});
+  var dia={on:true, doble:false, f1:[abre,cierra], f2:["",""]};
+  dias.forEach(function(d){ esp[d]=dia; });
+  c.especiales=esp;
+  c.francos=(c.francos||[]).filter(function(d){ return dias.indexOf(d)<0; });
+  var fuera=getTurnos().filter(function(t){
+    if(t.estado==="cancelado"||t.estado==="realizado") return false;
+    var dt=new Date(t.fecha); if(dias.indexOf(iso(dt))<0) return false;
+    var m=dt.getHours()*60+dt.getMinutes();
+    return m<toMin(abre) || m>=toMin(cierra);
+  });
+  write(K.cfg,c);
+  document.getElementById("espDesde").value=""; document.getElementById("espHasta").value="";
+  renderEspeciales(); renderFrancos(); renderTurnos();
+  if(fuera.length) alert("Ojo: "+fuera.length+(fuera.length===1?" turno queda":" turnos quedan")+
+    " fuera del horario nuevo:\n\n"+fuera.map(function(t){ return "• "+fmtDia(t.fecha)+" "+fmtHora(t.fecha)+" "+t.nombre; }).join("\n")+
+    "\n\nNo los cancelé: fijate vos qué hacer con cada uno.");
+}
+function removeEspecial(d){
+  var c=getCfg(); var esp=Object.assign({}, c.especiales||{}); delete esp[d];
+  c.especiales=esp; write(K.cfg,c); renderEspeciales(); renderTurnos();
 }
 // aviso a los clientes de los turnos cancelados por franco (demo: links wa.me con mensaje listo).
 // Cada mensaje usa la fecha propia del turno (sirve para rangos de varios días).
